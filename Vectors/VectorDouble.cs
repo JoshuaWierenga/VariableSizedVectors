@@ -12,7 +12,6 @@ using System.Text;
 namespace Vectors
 {
     //TODO Support larger vectors, first with operations via software fallback and then via optimised elementwise operations
-    //TODO Perform 3 and 4 value optimisation using Sse2 if Avx is not supported
     public readonly struct VectorDouble : IEquatable<VectorDouble>, IFormattable
     {
         private readonly Register _vector;
@@ -93,7 +92,21 @@ namespace Vectors
             MultiSizeVector = false;
         }
 
-        //TODO Add Vector(ReadOnlySpan<byte>)?
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public VectorDouble(ReadOnlySpan<byte> values)
+        {
+            //64 is sizeof(double)*4
+            if (values.Length >= 64)
+            {
+                throw new IndexOutOfRangeException();
+            }
+
+            Count = (byte)(values.Length / 8);
+
+            _vector = Unsafe.ReadUnaligned<Register>(ref MemoryMarshal.GetReference(values));
+
+            MultiSizeVector = false;
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public VectorDouble(ReadOnlySpan<double> values)
@@ -114,11 +127,20 @@ namespace Vectors
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public VectorDouble(Span<double> values) : this((ReadOnlySpan<double>)values) { }
 
-        //TODO Add CopyTo(ReadOnlySpan<byte>)?
+        public readonly void CopyTo(Span<byte> destination)
+        {
+            //8 is sizeof(double)
+            if ((uint)destination.Length != (uint)(Count * 8))
+            {
+                throw new ArgumentException();
+            }
+
+            Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(destination), _vector);
+        }
 
         public readonly void CopyTo(Span<double> destination)
         {
-            if ((uint)destination.Length < (uint)Count)
+            if ((uint)destination.Length != (uint)Count)
             {
                 throw new ArgumentException();
             }
@@ -152,9 +174,9 @@ namespace Vectors
             index switch
             {
                 0 => _vector.double_0,
-                1 => _vector.double_1,
-                2 => _vector.double_2,
-                3 => _vector.double_3,
+                1 when Count >= 2 => _vector.double_1,
+                2 when Count >= 3 => _vector.double_2,
+                3 when Count >= 4 => _vector.double_3,
                 _ => throw new IndexOutOfRangeException()
             };
 
@@ -234,11 +256,21 @@ namespace Vectors
             return sb.ToString();
         }
 
-        //TODO Add TryCopyTo(ReadOnlySpan<byte>)?
+        public readonly bool TryCopyTo(Span<byte> destination)
+        {
+            //8 is sizeof(double)
+            if ((uint)destination.Length < (uint)Count * 8)
+            {
+                return false;
+            }
+
+            Unsafe.WriteUnaligned(ref MemoryMarshal.GetReference(destination), _vector);
+            return true;
+        }
 
         public readonly bool TryCopyTo(Span<double> destination)
         {
-            if ((uint)destination.Length != (uint)Count)
+            if ((uint)destination.Length < (uint)Count)
             {
                 return false;
             }
@@ -271,24 +303,45 @@ namespace Vectors
 
             return size switch
             {
-                2 when Sse2.IsSupported => new VectorDouble(Sse2.Add(left._vector.vector_128, right._vector.vector_128)),
-                3 when Avx.IsSupported => new VectorDouble(Avx.Add(left._vector.vector_256, right._vector.vector_256), size),
-                4 when Avx.IsSupported => new VectorDouble(Avx.Add(left._vector.vector_256, right._vector.vector_256), size),
+                //Full size vector instructions
+                2 when Sse2.IsSupported => new VectorDouble(Sse2.Add(left._vector.vector_128_0,
+                    right._vector.vector_128_0)),
+                3 when Avx.IsSupported => new VectorDouble(Avx.Add(left._vector.vector_256, right._vector.vector_256),
+                    size),
+                4 when Avx.IsSupported => new VectorDouble(Avx.Add(left._vector.vector_256, right._vector.vector_256),
+                    size),
 
+                //Full size vector instructions
+                //Partial size vector instructions
+                3 when Sse2.IsSupported => new VectorDouble(
+                    Vector256.Create(Sse2.Add(left._vector.vector_128_0, right._vector.vector_128_0),
+                        Vector128.CreateScalarUnsafe(left._vector.double_2 + right._vector.double_2)), size),
+                4 when Sse2.IsSupported => new VectorDouble(
+                    Vector256.Create(Sse2.Add(left._vector.vector_128_0, right._vector.vector_128_0),
+                        Sse2.Add(left._vector.vector_128_1, right._vector.vector_128_1)), size),
+
+                //Software fallback
                 1 => new VectorDouble(left._vector.double_0 + right._vector.double_0),
                 2 => new VectorDouble(
-                    new[] { left._vector.double_0 + right._vector.double_0, left._vector.double_1 + right._vector.double_1 }, 0),
+                    new[]
+                    {
+                        left._vector.double_0 + right._vector.double_0,
+                        left._vector.double_1 + right._vector.double_1
+                    }, 0),
                 3 => new VectorDouble(
                     new[]
                     {
-                        left._vector.double_0 + right._vector.double_0, left._vector.double_1 + right._vector.double_1,
+                        left._vector.double_0 + right._vector.double_0,
+                        left._vector.double_1 + right._vector.double_1,
                         left._vector.double_2 + right._vector.double_2
                     }, 0),
                 4 => new VectorDouble(
                     new[]
                     {
-                        left._vector.double_0 + right._vector.double_0, left._vector.double_1 + right._vector.double_1,
-                        left._vector.double_2 + right._vector.double_2, left._vector.double_3 + right._vector.double_3
+                        left._vector.double_0 + right._vector.double_0,
+                        left._vector.double_1 + right._vector.double_1,
+                        left._vector.double_2 + right._vector.double_2,
+                        left._vector.double_3 + right._vector.double_3
                     }, 0),
 
                 _ => throw new IndexOutOfRangeException()
@@ -318,9 +371,18 @@ namespace Vectors
 
             return size switch
             {
-                2 when Sse2.IsSupported => new VectorDouble(Sse2.Subtract(left._vector.vector_128, right._vector.vector_128)),
+                //Full size vector instructions
+                2 when Sse2.IsSupported => new VectorDouble(Sse2.Subtract(left._vector.vector_128_0, right._vector.vector_128_0)),
                 3 when Avx.IsSupported => new VectorDouble(Avx.Subtract(left._vector.vector_256, right._vector.vector_256), size),
                 4 when Avx.IsSupported => new VectorDouble(Avx.Subtract(left._vector.vector_256, right._vector.vector_256), size),
+
+                //Partial size vector instructions
+                3 when Sse2.IsSupported => new VectorDouble(
+                    Vector256.Create(Sse2.Subtract(left._vector.vector_128_0, right._vector.vector_128_0),
+                        Vector128.CreateScalarUnsafe(left._vector.double_2 - right._vector.double_2)), size),
+                4 when Sse2.IsSupported => new VectorDouble(
+                    Vector256.Create(Sse2.Subtract(left._vector.vector_128_0, right._vector.vector_128_0),
+                        Sse2.Subtract(left._vector.vector_128_1, right._vector.vector_128_1)), size),
 
                 1 => new VectorDouble(left._vector.double_0 - right._vector.double_0),
                 2 => new VectorDouble(
@@ -367,9 +429,18 @@ namespace Vectors
 
             return size switch
             {
-                2 when Sse2.IsSupported => new VectorDouble(Sse2.Multiply(left._vector.vector_128, right._vector.vector_128)),
+                //Full size vector instructions
+                2 when Sse2.IsSupported => new VectorDouble(Sse2.Multiply(left._vector.vector_128_0, right._vector.vector_128_0)),
                 3 when Avx.IsSupported => new VectorDouble(Avx.Multiply(left._vector.vector_256, right._vector.vector_256), size),
                 4 when Avx.IsSupported => new VectorDouble(Avx.Multiply(left._vector.vector_256, right._vector.vector_256), size),
+
+                //Partial size vector instructions
+                3 when Sse2.IsSupported => new VectorDouble(
+                    Vector256.Create(Sse2.Multiply(left._vector.vector_128_0, right._vector.vector_128_0),
+                        Vector128.CreateScalarUnsafe(left._vector.double_2 * right._vector.double_2)), size),
+                4 when Sse2.IsSupported => new VectorDouble(
+                    Vector256.Create(Sse2.Multiply(left._vector.vector_128_0, right._vector.vector_128_0),
+                        Sse2.Multiply(left._vector.vector_128_1, right._vector.vector_128_1)), size),
 
                 1 => new VectorDouble(left._vector.double_0 * right._vector.double_0),
                 2 => new VectorDouble(
@@ -399,7 +470,7 @@ namespace Vectors
                 return new VectorDouble(value._vector.double_0 * factor);
             }
 
-            //TODO Add Sse2/Avx support? Requires broadcasting factor to a vector and then multiplying
+            //TODO Add Sse2/Avx support? Requires broadcasting factor to a vector and then multiplying with full/partial size vector instruction support
             return value.Count switch
             {
                 1 => new VectorDouble(value._vector.double_0 * factor),
@@ -448,9 +519,18 @@ namespace Vectors
 
             return size switch
             {
-                2 when Sse2.IsSupported => new VectorDouble(Sse2.Divide(left._vector.vector_128, right._vector.vector_128)),
+                //Full size vector instructions
+                2 when Sse2.IsSupported => new VectorDouble(Sse2.Divide(left._vector.vector_128_0, right._vector.vector_128_0)),
                 3 when Avx.IsSupported => new VectorDouble(Avx.Divide(left._vector.vector_256, right._vector.vector_256), size),
                 4 when Avx.IsSupported => new VectorDouble(Avx.Divide(left._vector.vector_256, right._vector.vector_256), size),
+
+                //Partial size vector instructions
+                3 when Sse2.IsSupported => new VectorDouble(
+                    Vector256.Create(Sse2.Divide(left._vector.vector_128_0, right._vector.vector_128_0),
+                        Vector128.CreateScalarUnsafe(left._vector.double_2 / right._vector.double_2)), size),
+                4 when Sse2.IsSupported => new VectorDouble(
+                    Vector256.Create(Sse2.Divide(left._vector.vector_128_0, right._vector.vector_128_0),
+                        Sse2.Divide(left._vector.vector_128_1, right._vector.vector_128_1)), size),
 
                 1 => new VectorDouble(left._vector.double_0 / right._vector.double_0),
                 2 => new VectorDouble(
@@ -501,16 +581,32 @@ namespace Vectors
 
             switch (size)
             {
+                //Full size vector instructions
                 case 2 when Sse2.IsSupported:
                     {
-                        Vector128<double> result = Sse2.CompareEqual(left._vector.vector_128, right._vector.vector_128);
+                        Vector128<double> result = Sse2.CompareEqual(left._vector.vector_128_0, right._vector.vector_128_0);
                         return Sse2.MoveMask(result) == 0b11;
                     }
                 case 3 when Avx.IsSupported:
                 case 4 when Avx.IsSupported:
                     {
-                        Vector256<double> result = Avx.Compare(left._vector.vector_256, right._vector.vector_256, FloatComparisonMode.OrderedEqualNonSignaling);
+                        Vector256<double> result = Avx.Compare(left._vector.vector_256, right._vector.vector_256,
+                            FloatComparisonMode.OrderedEqualNonSignaling);
                         return Avx.MoveMask(result) == 0b1111;
+                    }
+
+                //Partial size vector instructions
+                case 3 when Sse2.IsSupported:
+                    {
+                        Vector128<double> result = Sse2.CompareEqual(left._vector.vector_128_0, right._vector.vector_128_0);
+                        return Sse2.MoveMask(result) == 0b11 && left._vector.double_2.Equals(right._vector.double_2);
+
+                    }
+                case 4 when Sse2.IsSupported:
+                    {
+                        Vector128<double> result1 = Sse2.CompareEqual(left._vector.vector_128_0, right._vector.vector_128_0);
+                        Vector128<double> result2 = Sse2.CompareEqual(left._vector.vector_128_1, right._vector.vector_128_1);
+                        return Sse2.MoveMask(result1) == 0b11 && Sse2.MoveMask(result2) == 0b11;
                     }
 
                 case 1 when left._vector.double_0.Equals(right._vector.double_0):

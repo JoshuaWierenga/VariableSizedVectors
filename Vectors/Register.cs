@@ -15,7 +15,8 @@ namespace Vectors
         internal readonly double double_3;
 
         //internal Vector64<double> vector_64 => => Unsafe.As<Register, Vector64<double>>(ref this);
-        internal Vector128<double> vector_128 => Unsafe.As<Register, Vector128<double>>(ref this);
+        internal Vector128<double> vector_128_0 => Unsafe.As<Register, Vector128<double>>(ref this);
+        internal Vector128<double> vector_128_1 => Unsafe.As<Register, Vector128<double>>(ref Unsafe.AddByteOffset(ref this, (IntPtr)16));
         internal Vector256<double> vector_256 => Unsafe.As<Register, Vector256<double>>(ref this);
 
         internal Register(double value)
