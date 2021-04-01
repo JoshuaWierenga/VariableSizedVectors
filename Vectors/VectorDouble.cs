@@ -4,20 +4,18 @@ using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
 using System.Runtime.Intrinsics.X86;
 using System.Text;
 
 namespace Vectors
 {
-    //TODO Split 3 and 4 value fallback cases
-    public readonly struct VectorDouble : IEquatable<VectorDouble>
+    //TODO Support larger vectors, first with operations via software fallback and then via optimised elementwise operations
+    //TODO Perform 3 and 4 value optimisation using Sse2 if Avx is not supported
+    public readonly struct VectorDouble : IEquatable<VectorDouble>, IFormattable
     {
-        //TODO Replace with direct register access like Vector<T> uses
-        //TODO Merge 1 with 2 once 3 has been added?
-        private readonly Vector64<double> _vector64;
-        private readonly Vector128<double> _vector128;
-        private readonly Vector256<double> _vector256;
+        private readonly Register _vector;
 
         public readonly byte Count;
         private readonly bool MultiSizeVector;
@@ -46,124 +44,69 @@ namespace Vectors
             }
         }
 
-        //TODO is this needed or could constants just use the biggest supported size?
         private VectorDouble(double value, bool allSizes)
         {
-            _vector64 = Vector64.Create(value);
-            _vector128 = Vector128.Create(value);
-            _vector256 = Vector256.Create(value);
-            Count = 2;
+            _vector = new Register(value);
+            Count = 4;
             MultiSizeVector = true;
         }
 
         private VectorDouble(Vector128<double> values)
         {
-            _vector64 = default;
-            _vector128 = values;
-            _vector256 = default;
+            _vector = new Register(values);
             Count = 2;
             MultiSizeVector = false;
         }
 
         private VectorDouble(Vector256<double> values, byte count)
         {
-            _vector64 = default;
-            _vector128 = default;
-            _vector256 = values;
+            _vector = new Register(values);
             Count = count;
             MultiSizeVector = false;
         }
 
         public VectorDouble(double value)
         {
-            _vector64 = Vector64.Create(value);
-            _vector128 = default;
-            _vector256 = default;
+            _vector = new Register(value);
             Count = 1;
             MultiSizeVector = false;
         }
 
-        public VectorDouble(double[] values) : this(values, 0, 0) { }
+        public VectorDouble(double[] values) : this(values, 0) { }
 
-        public VectorDouble(double[] value, int index) : this(value, index, 0) { }
-
-        private VectorDouble(double[] values, int index, byte count)
+        public VectorDouble(double[] values, int index)
         {
             if (values is null)
             {
                 throw new NullReferenceException();
             }
 
-            if (index < 0 || values.Length <= index)
+            if (index < 0 || values.Length <= index || values.Length - index > 4)
             {
                 throw new IndexOutOfRangeException();
             }
 
-            Count = count == 0 ? (byte)(values.Length - index) : count;
+            Count = (byte)(values.Length - index);
 
-            switch (Count)
-            {
-                case 1:
-                    _vector64 = Vector64.Create(values[index]);
-                    _vector128 = default;
-                    _vector256 = default;
-                    break;
-                case 2:
-                    _vector64 = default;
-                    _vector128 = Vector128.Create(values[index], values[index + 1]);
-                    _vector256 = default;
-                    break;
-                case 3:
-                    _vector64 = default;
-                    _vector128 = default;
-                    _vector256 = Vector256.Create(values[index], values[index + 1], values[index + 2], 0);
-                    break;
-                case 4:
-                    _vector64 = default;
-                    _vector128 = default;
-                    _vector256 = Vector256.Create(values[index], values[index + 1], values[index + 2],
-                        values[index + 3]);
-                    break;
-                default:
-                    throw new IndexOutOfRangeException();
-            }
+            _vector = Unsafe.ReadUnaligned<Register>(ref Unsafe.As<double, byte>(ref values[index]));
 
             MultiSizeVector = false;
         }
 
+        //TODO Add Vector(ReadOnlySpan<byte>)?
+
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public VectorDouble(ReadOnlySpan<double> values)
         {
+            if (values.Length > 4)
+            {
+                throw new IndexOutOfRangeException();
+            }
+
             Count = (byte)values.Length;
 
-            switch (Count)
-            {
-                case 1:
-                    _vector64 = Vector64.Create(values[0]);
-                    _vector128 = default;
-                    _vector256 = default;
-                    Count = 1;
-                    break;
-                case 2:
-                    _vector64 = default;
-                    _vector128 = Vector128.Create(values[0], values[1]);
-                    _vector256 = default;
-                    Count = 2;
-                    break;
-                case 3:
-                    _vector64 = default;
-                    _vector128 = default;
-                    _vector256 = Vector256.Create(values[0], values[1], values[2], 0);
-                    break;
-                case 4:
-                    _vector64 = default;
-                    _vector128 = default;
-                    _vector256 = Vector256.Create(values[0], values[1], values[2], values[3]);
-                    Count = 4;
-                    break;
-                default:
-                    throw new IndexOutOfRangeException();
-            }
+            _vector = Unsafe.ReadUnaligned<Register>(
+                ref Unsafe.As<double, byte>(ref MemoryMarshal.GetReference(values)));
 
             MultiSizeVector = false;
         }
@@ -171,7 +114,49 @@ namespace Vectors
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public VectorDouble(Span<double> values) : this((ReadOnlySpan<double>)values) { }
 
-        //TODO Add CopyTo overloads and index once more than one item is supported
+        //TODO Add CopyTo(ReadOnlySpan<byte>)?
+
+        public readonly void CopyTo(Span<double> destination)
+        {
+            if ((uint)destination.Length < (uint)Count)
+            {
+                throw new ArgumentException();
+            }
+
+            Unsafe.WriteUnaligned(ref Unsafe.As<double, byte>(ref MemoryMarshal.GetReference(destination)), _vector);
+        }
+
+        public readonly void CopyTo(double[] destination) => CopyTo(destination, 0);
+
+        public readonly unsafe void CopyTo(double[] destination, int startIndex)
+        {
+            if (destination is null)
+            {
+                throw new NullReferenceException();
+            }
+
+            if ((uint)startIndex >= (uint)destination.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(startIndex));
+            }
+
+            if (destination.Length - startIndex > 4)
+            {
+                throw new ArgumentException();
+            }
+
+            Unsafe.WriteUnaligned(ref Unsafe.As<double, byte>(ref destination[startIndex]), _vector);
+        }
+
+        public readonly unsafe double this[int index] =>
+            index switch
+            {
+                0 => _vector.double_0,
+                1 => _vector.double_1,
+                2 => _vector.double_2,
+                3 => _vector.double_3,
+                _ => throw new IndexOutOfRangeException()
+            };
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override readonly bool Equals([NotNullWhen(true)] object? obj) =>
@@ -183,24 +168,24 @@ namespace Vectors
         {
             if (Count == 1)
             {
-                return _vector64.ToScalar().GetHashCode();
+                return _vector.double_0.GetHashCode();
             }
 
             HashCode hashCode = default;
 
             if (Count == 2)
             {
-                hashCode.Add(_vector128.GetElement(0));
-                hashCode.Add(_vector128.GetElement(1));
+                hashCode.Add(_vector.double_0);
+                hashCode.Add(_vector.double_1);
             }
             else
             {
-                hashCode.Add(_vector256.GetElement(0));
-                hashCode.Add(_vector256.GetElement(1));
-                hashCode.Add(_vector256.GetElement(2));
+                hashCode.Add(_vector.double_0);
+                hashCode.Add(_vector.double_1);
+                hashCode.Add(_vector.double_2);
                 if (Count == 4)
                 {
-                    hashCode.Add(_vector256.GetElement(3));
+                    hashCode.Add(_vector.double_3);
                 }
             }
 
@@ -219,28 +204,28 @@ namespace Vectors
             switch (Count)
             {
                 case 1:
-                    sb.Append(_vector64.ToScalar().ToString(format, formatProvider));
+                    sb.Append(_vector.double_0.ToString(format, formatProvider));
                     break;
                 case 2:
-                    sb.Append(_vector128.GetElement(0).ToString(format, formatProvider));
+                    sb.Append(_vector.double_0.ToString(format, formatProvider));
                     sb.Append(NumberFormatInfo.GetInstance(formatProvider).NumberGroupSeparator);
                     sb.Append(' ');
-                    sb.Append(_vector128.GetElement(1).ToString(format, formatProvider));
+                    sb.Append(_vector.double_1.ToString(format, formatProvider));
                     break;
                 case 3:
                 case 4:
-                    sb.Append(_vector256.GetElement(0).ToString(format, formatProvider));
+                    sb.Append(_vector.double_0.ToString(format, formatProvider));
                     sb.Append(NumberFormatInfo.GetInstance(formatProvider).NumberGroupSeparator);
                     sb.Append(' ');
-                    sb.Append(_vector256.GetElement(1).ToString(format, formatProvider));
+                    sb.Append(_vector.double_1.ToString(format, formatProvider));
                     sb.Append(NumberFormatInfo.GetInstance(formatProvider).NumberGroupSeparator);
                     sb.Append(' ');
-                    sb.Append(_vector256.GetElement(2).ToString(format, formatProvider));
+                    sb.Append(_vector.double_2.ToString(format, formatProvider));
                     if (Count == 4)
                     {
                         sb.Append(NumberFormatInfo.GetInstance(formatProvider).NumberGroupSeparator);
                         sb.Append(' ');
-                        sb.Append(_vector256.GetElement(3).ToString(format, formatProvider));
+                        sb.Append(_vector.double_3.ToString(format, formatProvider));
                     }
                     break;
             }
@@ -249,7 +234,18 @@ namespace Vectors
             return sb.ToString();
         }
 
-        //TODO Add TryCopyTo overloads once more than one item is supported
+        //TODO Add TryCopyTo(ReadOnlySpan<byte>)?
+
+        public readonly bool TryCopyTo(Span<double> destination)
+        {
+            if ((uint)destination.Length != (uint)Count)
+            {
+                return false;
+            }
+
+            Unsafe.WriteUnaligned(ref Unsafe.As<double, byte>(ref MemoryMarshal.GetReference(destination)), _vector);
+            return true;
+        }
 
         //Operators
         public static VectorDouble operator +(VectorDouble left, VectorDouble right)
@@ -273,33 +269,30 @@ namespace Vectors
                 size = left.Count;
             }
 
-            switch (size)
+            return size switch
             {
-                case 1:
-                    return new VectorDouble(left._vector64.ToScalar() + right._vector64.ToScalar());
-                case 2 when Sse2.IsSupported:
-                    return new VectorDouble(Sse2.Add(left._vector128, right._vector128));
-                case 2:
-                    return new VectorDouble(new[]
+                2 when Sse2.IsSupported => new VectorDouble(Sse2.Add(left._vector.vector_128, right._vector.vector_128)),
+                3 when Avx.IsSupported => new VectorDouble(Avx.Add(left._vector.vector_256, right._vector.vector_256), size),
+                4 when Avx.IsSupported => new VectorDouble(Avx.Add(left._vector.vector_256, right._vector.vector_256), size),
+
+                1 => new VectorDouble(left._vector.double_0 + right._vector.double_0),
+                2 => new VectorDouble(
+                    new[] { left._vector.double_0 + right._vector.double_0, left._vector.double_1 + right._vector.double_1 }, 0),
+                3 => new VectorDouble(
+                    new[]
                     {
-                        left._vector128.GetElement(0) + right._vector128.GetElement(0),
-                        left._vector128.GetElement(1) + right._vector128.GetElement(1)
-                    }, 0, size);
-                case 3 when Avx.IsSupported:
-                case 4 when Avx.IsSupported:
-                    return new VectorDouble(Avx.Add(left._vector256, right._vector256), size);
-                case 3:
-                case 4:
-                    return new VectorDouble(new[]
+                        left._vector.double_0 + right._vector.double_0, left._vector.double_1 + right._vector.double_1,
+                        left._vector.double_2 + right._vector.double_2
+                    }, 0),
+                4 => new VectorDouble(
+                    new[]
                     {
-                        left._vector256.GetElement(0) + right._vector256.GetElement(0),
-                        left._vector256.GetElement(1) + right._vector256.GetElement(1),
-                        left._vector256.GetElement(2) + right._vector256.GetElement(2),
-                        left._vector256.GetElement(3) + right._vector256.GetElement(3)
-                    }, 0, size);
-                default:
-                    throw new IndexOutOfRangeException();
-            }
+                        left._vector.double_0 + right._vector.double_0, left._vector.double_1 + right._vector.double_1,
+                        left._vector.double_2 + right._vector.double_2, left._vector.double_3 + right._vector.double_3
+                    }, 0),
+
+                _ => throw new IndexOutOfRangeException()
+            };
         }
 
         public static VectorDouble operator -(VectorDouble left, VectorDouble right)
@@ -323,33 +316,30 @@ namespace Vectors
                 size = left.Count;
             }
 
-            switch (size)
+            return size switch
             {
-                case 1:
-                    return new VectorDouble(left._vector64.ToScalar() - right._vector64.ToScalar());
-                case 2 when Sse2.IsSupported:
-                    return new VectorDouble(Sse2.Subtract(left._vector128, right._vector128));
-                case 2:
-                    return new VectorDouble(new[]
+                2 when Sse2.IsSupported => new VectorDouble(Sse2.Subtract(left._vector.vector_128, right._vector.vector_128)),
+                3 when Avx.IsSupported => new VectorDouble(Avx.Subtract(left._vector.vector_256, right._vector.vector_256), size),
+                4 when Avx.IsSupported => new VectorDouble(Avx.Subtract(left._vector.vector_256, right._vector.vector_256), size),
+
+                1 => new VectorDouble(left._vector.double_0 - right._vector.double_0),
+                2 => new VectorDouble(
+                    new[] { left._vector.double_0 - right._vector.double_0, left._vector.double_1 - right._vector.double_1 }, 0),
+                3 => new VectorDouble(
+                    new[]
                     {
-                        left._vector128.GetElement(0) - right._vector128.GetElement(0),
-                        left._vector128.GetElement(1) - right._vector128.GetElement(1)
-                    }, 0, size);
-                case 3 when Avx.IsSupported:
-                case 4 when Avx.IsSupported:
-                    return new VectorDouble(Avx.Subtract(left._vector256, right._vector256), size);
-                case 3:
-                case 4:
-                    return new VectorDouble(new[]
+                        left._vector.double_0 - right._vector.double_0, left._vector.double_1 - right._vector.double_1,
+                        left._vector.double_2 - right._vector.double_2
+                    }, 0),
+                4 => new VectorDouble(
+                    new[]
                     {
-                        left._vector256.GetElement(0) - right._vector256.GetElement(0),
-                        left._vector256.GetElement(1) - right._vector256.GetElement(1),
-                        left._vector256.GetElement(2) - right._vector256.GetElement(2),
-                        left._vector256.GetElement(3) - right._vector256.GetElement(3)
-                    }, 0, size);
-                default:
-                    throw new IndexOutOfRangeException();
-            }
+                        left._vector.double_0 - right._vector.double_0, left._vector.double_1 - right._vector.double_1,
+                        left._vector.double_2 - right._vector.double_2, left._vector.double_3 - right._vector.double_3
+                    }, 0),
+
+                _ => throw new IndexOutOfRangeException()
+            };
         }
 
         //TODO Add Dot/Transposed Multiplication, Cross?
@@ -375,33 +365,30 @@ namespace Vectors
                 size = left.Count;
             }
 
-            switch (size)
+            return size switch
             {
-                case 1:
-                    return new VectorDouble(left._vector64.ToScalar() * right._vector64.ToScalar());
-                case 2 when Sse2.IsSupported:
-                    return new VectorDouble(Sse2.Multiply(left._vector128, right._vector128));
-                case 2:
-                    return new VectorDouble(new[]
+                2 when Sse2.IsSupported => new VectorDouble(Sse2.Multiply(left._vector.vector_128, right._vector.vector_128)),
+                3 when Avx.IsSupported => new VectorDouble(Avx.Multiply(left._vector.vector_256, right._vector.vector_256), size),
+                4 when Avx.IsSupported => new VectorDouble(Avx.Multiply(left._vector.vector_256, right._vector.vector_256), size),
+
+                1 => new VectorDouble(left._vector.double_0 * right._vector.double_0),
+                2 => new VectorDouble(
+                    new[] { left._vector.double_0 * right._vector.double_0, left._vector.double_1 * right._vector.double_1 }, 0),
+                3 => new VectorDouble(
+                    new[]
                     {
-                        left._vector128.GetElement(0) * right._vector128.GetElement(0),
-                        left._vector128.GetElement(1) * right._vector128.GetElement(1)
-                    }, 0, size);
-                case 3 when Avx.IsSupported:
-                case 4 when Avx.IsSupported:
-                    return new VectorDouble(Avx.Multiply(left._vector256, right._vector256), size);
-                case 3:
-                case 4:
-                    return new VectorDouble(new[]
+                        left._vector.double_0 * right._vector.double_0, left._vector.double_1 * right._vector.double_1,
+                        left._vector.double_2 * right._vector.double_2
+                    }, 0),
+                4 => new VectorDouble(
+                    new[]
                     {
-                        left._vector256.GetElement(0) * right._vector256.GetElement(0),
-                        left._vector256.GetElement(1) * right._vector256.GetElement(1),
-                        left._vector256.GetElement(2) * right._vector256.GetElement(2),
-                        left._vector256.GetElement(3) * right._vector256.GetElement(3)
-                    }, 0, size);
-                default:
-                    throw new IndexOutOfRangeException();
-            }
+                        left._vector.double_0 * right._vector.double_0, left._vector.double_1 * right._vector.double_1,
+                        left._vector.double_2 * right._vector.double_2, left._vector.double_3 * right._vector.double_3
+                    }, 0),
+
+                _ => throw new IndexOutOfRangeException()
+            };
         }
 
         //Element wise multiplication
@@ -409,32 +396,29 @@ namespace Vectors
         {
             if (value.Count == 1)
             {
-                return new VectorDouble(value._vector64.ToScalar() * factor);
+                return new VectorDouble(value._vector.double_0 * factor);
             }
 
             //TODO Add Sse2/Avx support? Requires broadcasting factor to a vector and then multiplying
-            switch (value.Count)
+            return value.Count switch
             {
-                case 1:
-                    return new VectorDouble(value._vector64.ToScalar() * factor);
-                case 2:
-                    return new VectorDouble(new[]
+                1 => new VectorDouble(value._vector.double_0 * factor),
+                2 => new VectorDouble(
+                    new[] { value._vector.double_0 * factor, value._vector.double_1 * factor }, 0),
+                3 => new VectorDouble(
+                    new[]
                     {
-                        value._vector128.GetElement(0) * factor,
-                        value._vector128.GetElement(1) * factor
-                    }, 0, value.Count);
-                case 3:
-                case 4:
-                    return new VectorDouble(new[]
+                        value._vector.double_0 * factor, value._vector.double_1 * factor,value._vector.double_2 * factor
+                    }, 0),
+                4 => new VectorDouble(
+                    new[]
                     {
-                        value._vector256.GetElement(0) * factor,
-                        value._vector256.GetElement(1) * factor,
-                        value._vector256.GetElement(2) * factor,
-                        value._vector256.GetElement(3) * factor
-                    }, 0, value.Count);
-                default:
-                    throw new IndexOutOfRangeException();
-            }
+                        value._vector.double_0 * factor, value._vector.double_1 * factor,value._vector.double_2 * factor,
+                        value._vector.double_3 * factor
+                    }, 0),
+
+                _ => throw new IndexOutOfRangeException()
+            };
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -462,59 +446,36 @@ namespace Vectors
                 size = left.Count;
             }
 
-            switch (size)
+            return size switch
             {
-                case 1:
-                    return new VectorDouble(left._vector64.ToScalar() / right._vector64.ToScalar());
-                case 2 when Sse2.IsSupported:
-                    return new VectorDouble(Sse2.Divide(left._vector128, right._vector128));
-                case 2:
-                    return new VectorDouble(new[]
+                2 when Sse2.IsSupported => new VectorDouble(Sse2.Divide(left._vector.vector_128, right._vector.vector_128)),
+                3 when Avx.IsSupported => new VectorDouble(Avx.Divide(left._vector.vector_256, right._vector.vector_256), size),
+                4 when Avx.IsSupported => new VectorDouble(Avx.Divide(left._vector.vector_256, right._vector.vector_256), size),
+
+                1 => new VectorDouble(left._vector.double_0 / right._vector.double_0),
+                2 => new VectorDouble(
+                    new[] { left._vector.double_0 * right._vector.double_0, left._vector.double_1 * right._vector.double_1 }, 0),
+                3 => new VectorDouble(
+                    new[]
                     {
-                        left._vector128.GetElement(0) / right._vector128.GetElement(0),
-                        left._vector128.GetElement(1) / right._vector128.GetElement(1)
-                    }, 0, size);
-                case 3 when Avx.IsSupported:
-                case 4 when Avx.IsSupported:
-                    return new VectorDouble(Avx.Divide(left._vector256, right._vector256), size);
-                case 3:
-                case 4:
-                    return new VectorDouble(new[]
+                        left._vector.double_0 / right._vector.double_0, left._vector.double_1 / right._vector.double_1,
+                        left._vector.double_2 / right._vector.double_2
+                    }, 0),
+                4 => new VectorDouble(
+                    new[]
                     {
-                        left._vector256.GetElement(0) / right._vector256.GetElement(0),
-                        left._vector256.GetElement(1) / right._vector256.GetElement(1),
-                        left._vector256.GetElement(2) / right._vector256.GetElement(2),
-                        left._vector256.GetElement(3) / right._vector256.GetElement(3)
-                    }, 0, size);
-                default:
-                    throw new IndexOutOfRangeException();
-            }
+                        left._vector.double_0 / right._vector.double_0, left._vector.double_1 / right._vector.double_1,
+                        left._vector.double_2 / right._vector.double_2, left._vector.double_3 / right._vector.double_3
+                    }, 0),
+
+                _ => throw new IndexOutOfRangeException()
+            };
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static VectorDouble operator -(VectorDouble value) => Zero - value;
 
-        //TODO Add, double {&, |, ^} double is not supported, can be faked using int64 like in https://github.com/dotnet/runtime/blob/bce310d872c211049506f90149d498ab26ca6f81/src/libraries/System.Private.CoreLib/src/System/Numerics/Vector_1.cs#L461
-        /*public static VectorDouble operator &(VectorDouble left, VectorDouble right)
-        {
-            return new(left._vector64.ToScalar() & right._vector64.ToScalar());
-        }
-
-        public static VectorDouble operator |(VectorDouble left, VectorDouble right)
-        {
-            return new(left._vector64.ToScalar() | right._vector64.ToScalar());
-        }
-
-        public static VectorDouble operator ^(VectorDouble left, VectorDouble right)
-        {
-            return new(left._vector64.ToScalar() ^ right._vector64.ToScalar());
-        }
-
-        //Todo Inline, add VectorDouble.AllBitsSet?
-        public static VectorDouble operator ~(VectorDouble value)
-        {
-            return new(Vector64<double>.AllBitsSet.ToScalar() ^ value._vector64.ToScalar());
-        }*/
+        //TODO Add bitwise operations when integer types are supported
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool operator ==(VectorDouble left, VectorDouble right)
@@ -542,22 +503,26 @@ namespace Vectors
             {
                 case 2 when Sse2.IsSupported:
                     {
-                        Vector128<double> result = Sse2.CompareEqual(left._vector128, right._vector128);
+                        Vector128<double> result = Sse2.CompareEqual(left._vector.vector_128, right._vector.vector_128);
                         return Sse2.MoveMask(result) == 0b11;
                     }
                 case 3 when Avx.IsSupported:
                 case 4 when Avx.IsSupported:
                     {
-                        Vector256<double> result = Avx.Compare(left._vector256, right._vector256, FloatComparisonMode.OrderedEqualNonSignaling);
+                        Vector256<double> result = Avx.Compare(left._vector.vector_256, right._vector.vector_256, FloatComparisonMode.OrderedEqualNonSignaling);
                         return Avx.MoveMask(result) == 0b1111;
                     }
-                case 1 when left._vector64.ToScalar().Equals(right._vector64.ToScalar()):
-                case 2 when left._vector128.GetElement(0).Equals(right._vector128.GetElement(0)) &&
-                            left._vector128.GetElement(1).Equals(right._vector128.GetElement(1)):
-                case 4 when left._vector256.GetElement(0).Equals(right._vector256.GetElement(0)) &&
-                            left._vector256.GetElement(1).Equals(right._vector256.GetElement(1)) &&
-                            left._vector256.GetElement(2).Equals(right._vector256.GetElement(2)) &&
-                            left._vector256.GetElement(3).Equals(right._vector256.GetElement(3)):
+
+                case 1 when left._vector.double_0.Equals(right._vector.double_0):
+                case 2 when left._vector.double_0.Equals(right._vector.double_0) &&
+                            left._vector.double_1.Equals(right._vector.double_1):
+                case 3 when left._vector.double_0.Equals(right._vector.double_0) &&
+                            left._vector.double_1.Equals(right._vector.double_1) &&
+                            left._vector.double_2.Equals(right._vector.double_2):
+                case 4 when left._vector.double_0.Equals(right._vector.double_0) &&
+                            left._vector.double_1.Equals(right._vector.double_1) &&
+                            left._vector.double_2.Equals(right._vector.double_2) &&
+                            left._vector.double_3.Equals(right._vector.double_3):
                     return true;
                 default:
                     return false;
