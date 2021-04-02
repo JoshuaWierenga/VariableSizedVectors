@@ -31,7 +31,8 @@ namespace Vectors
 
         internal RegisterDouble(double value, bool multiSize = false)
         {
-            Doubles = new[] { value };
+            //Constant vectors need to work with avx instructions and so need to be 256 bit at a minimum
+            Doubles = multiSize ? new[] { value, value, value, value } : new[] { value };
             MultiSize = multiSize;
         }
 

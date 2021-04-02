@@ -19,29 +19,11 @@ namespace Vectors
     {
         private readonly RegisterDouble _vector;
 
-        public static VectorDouble Zero
-        {
-            get
-            {
-                return new(0, true);
-            }
-        }
+        public static VectorDouble Zero { get; } = new(0, true);
 
-        public static VectorDouble One
-        {
-            get
-            {
-                return new(1, true);
-            }
-        }
+        public static VectorDouble One { get; } = new(1, true);
 
-        internal static VectorDouble AllBitsSet
-        {
-            get
-            {
-                return new(BitConverter.Int64BitsToDouble(-1), true);
-            }
-        }
+        internal static VectorDouble AllBitsSet { get; } = new(BitConverter.Int64BitsToDouble(-1), true);
 
         private VectorDouble(double value, bool allSizes) => _vector = new RegisterDouble(value, true);
 
@@ -152,8 +134,8 @@ namespace Vectors
         {
             StringBuilder sb = new();
             string separator = NumberFormatInfo.GetInstance(formatProvider).NumberGroupSeparator;
+            
             sb.Append('<');
-
             sb.Append(_vector[0].ToString(format, formatProvider));
 
             switch (_vector.Doubles.Length)
