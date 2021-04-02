@@ -1,4 +1,4 @@
-﻿//Contains most of Vector<T> from https://github.com/dotnet/runtime/blob/76a50c6/src/libraries/System.Private.CoreLib/src/System/Numerics/Vector_1.cs which is under the MIT License.
+//Contains most of Vector<T> from https://github.com/dotnet/runtime/blob/76a50c6/src/libraries/System.Private.CoreLib/src/System/Numerics/Vector_1.cs which is under the MIT License.
 
 using System;
 using System.Diagnostics.CodeAnalysis;
@@ -46,8 +46,8 @@ namespace Vectors
             {
                 throw new IndexOutOfRangeException();
             }
-
-            _vector = new RegisterDouble(values);
+            //TODO Check performance of array[Range]
+            _vector = new RegisterDouble(values[index..]);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -166,7 +166,6 @@ namespace Vectors
                 default:
                     for (int i = 1; i < _vector.Doubles.Length; i++)
                     {
-
                         sb.Append(separator);
                         sb.Append(' ');
                         sb.Append(_vector[i].ToString(format, formatProvider));
