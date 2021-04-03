@@ -1,7 +1,7 @@
 
 ## Arbitrary Sized Performant Vectors in C#
 This project is an attempt at adding arbitrary sized vectors to C# with x86 vector extensions used to improve computation speed whenever possible.
-Sse2 and Avx are used if supported with a software fallback included for when they are not.
+Sse2 and Avx are used if supported with software fallbacks included for when they are not. There are hardcoded, unrolled cases for 64, 128, 192 and 256 bit vectors for efficiency since Avx and Sse2 can deal with them directly.
 
 ### Todo
 * Support types other than double.
