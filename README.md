@@ -5,6 +5,7 @@ Sse2 and Avx are used if supported with software fallbacks included for when the
 
 ### Todo
 * Support types other than double.
+* Add regression and performance testing.
 * Potentially use smt for very large vectors.
 * Extend support to matrices? If so then rename project. Does smt make more sense here for specific operations like matrix multiplication where only a single row/column of each matrix is needed at a time.
 * If possible support arm vector exensions as well.

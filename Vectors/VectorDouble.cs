@@ -836,7 +836,7 @@ namespace Vectors
                     int remainingSubOperations = size;
                     int processedSubOperations = 0;
 
-                    if (Avx.IsSupported && remainingSubOperations >= 4)
+                    if (Avx.IsSupported)
                     {
                         int count256 = remainingSubOperations >> 2;
 
