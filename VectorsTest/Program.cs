@@ -1,5 +1,5 @@
-﻿using Vectors;
-using System;
+﻿using System;
+using Vectors;
 
 namespace VectorsTest
 {
@@ -74,8 +74,8 @@ namespace VectorsTest
             Console.WriteLine($"{first} == {first} = {first == first}");
             Console.WriteLine($"{first} != {second} = {first != second}");
 
-            first = new VectorDouble(new[] { (double)6, 9, 20, 100, 36 });
-            second = new VectorDouble(new[] { (double)2, 3, 10, 50, 8 });
+            first = new VectorDouble(new[] { (double)6, 9, 20, 100, 36, 88, 11 });
+            second = new VectorDouble(new[] { (double)2, 3, 10, 50, 8, 45, 11 });
 
             Console.WriteLine();
 

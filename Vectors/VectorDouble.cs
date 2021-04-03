@@ -1,4 +1,4 @@
-//Contains most of Vector<T> from https://github.com/dotnet/runtime/blob/76a50c6/src/libraries/System.Private.CoreLib/src/System/Numerics/Vector_1.cs which is under the MIT License.
+﻿//Contains most of Vector<T> from https://github.com/dotnet/runtime/blob/76a50c6/src/libraries/System.Private.CoreLib/src/System/Numerics/Vector_1.cs which is under the MIT License.
 
 using System;
 using System.Diagnostics.CodeAnalysis;
@@ -11,13 +11,13 @@ using System.Text;
 
 namespace Vectors
 {
-    //TODO Add private constructors with multiple and mixed arguments like Vector128<double> and double for 192 bit Sse2 fallbacks
-    //and Vector128<double> and Vector128<double> for the 256 bit ones?
-    //TODO Improve larger vectors using optimised elementwise operations
+    //TODO Make more use of the new mixed argument constructor for 192 and 256 bit Sse2 fallbacks
     //TODO Add Range indexer, Index?
     public readonly struct VectorDouble : IEquatable<VectorDouble>, IFormattable
     {
         private readonly RegisterDouble _vector;
+
+        public readonly int Length => _vector.Doubles.Length;
 
         public static VectorDouble Zero { get; } = new(0, true);
 
@@ -30,6 +30,9 @@ namespace Vectors
         private VectorDouble(Vector128<double> values) => _vector = new RegisterDouble(values);
 
         private VectorDouble(Vector256<double> values, int count) => _vector = new RegisterDouble(values, count);
+
+        private VectorDouble(int count, double? value = null, Vector128<double>[] blocks128 = null,
+            Vector256<double>[] blocks256 = null) => _vector = new RegisterDouble(count, value, blocks128, blocks256);
 
         public VectorDouble(double value) => _vector = new RegisterDouble(value);
 
@@ -46,7 +49,7 @@ namespace Vectors
             {
                 throw new IndexOutOfRangeException();
             }
-            //TODO Check performance of array[Range]
+            //TODO Check performance of array[Range], is Span.Splice faster?
             _vector = new RegisterDouble(values[index..]);
         }
 
@@ -68,7 +71,7 @@ namespace Vectors
             }
 
             Unsafe.CopyBlockUnaligned(ref MemoryMarshal.GetReference(destination),
-                ref Unsafe.As<double, byte>(ref _vector.Doubles[0]), (uint) (_vector.Doubles.Length * sizeof(double)));
+                ref Unsafe.As<double, byte>(ref _vector.Doubles[0]), (uint)(_vector.Doubles.Length * sizeof(double)));
         }
 
         public readonly void CopyTo(Span<double> destination)
@@ -79,7 +82,7 @@ namespace Vectors
             }
 
             Unsafe.CopyBlockUnaligned(ref Unsafe.As<double, byte>(ref MemoryMarshal.GetReference(destination)),
-                ref Unsafe.As<double, byte>(ref _vector.Doubles[0]), (uint) (_vector.Doubles.Length * sizeof(double)));
+                ref Unsafe.As<double, byte>(ref _vector.Doubles[0]), (uint)(_vector.Doubles.Length * sizeof(double)));
         }
 
         public readonly void CopyTo(double[] destination) => CopyTo(destination, 0);
@@ -96,9 +99,8 @@ namespace Vectors
                 throw new ArgumentOutOfRangeException(nameof(startIndex));
             }
 
-            Unsafe.CopyBlockUnaligned(ref Unsafe.As<double, byte>(ref destination[0]),
-                ref Unsafe.As<double, byte>(ref _vector.Doubles[startIndex]),
-                (uint) ((_vector.Doubles.Length - startIndex) * sizeof(double)));
+            Unsafe.CopyBlockUnaligned(ref Unsafe.As<double, byte>(ref destination[startIndex]),
+                ref Unsafe.As<double, byte>(ref _vector.Doubles[0]), (uint)(_vector.Doubles.Length * sizeof(double)));
         }
 
         public readonly unsafe double this[int index] => _vector[index];
@@ -134,7 +136,7 @@ namespace Vectors
         {
             StringBuilder sb = new();
             string separator = NumberFormatInfo.GetInstance(formatProvider).NumberGroupSeparator;
-            
+
             sb.Append('<');
             sb.Append(_vector[0].ToString(format, formatProvider));
 
@@ -273,13 +275,60 @@ namespace Vectors
                             left._vector[3] + right._vector[3]
                         }, 0);
                 default:
-                    double[] newValues = new double[size];
-                    for (int i = 0; i < size; i++)
+
+                    //Assumption is made that no Sse2 support means no Avx support
+                    if (!Sse2.IsSupported)
                     {
-                        newValues[i] = left._vector[i] + right._vector[i];
+                        double[] values64 = new double[size];
+
+                        for (int i = 0; i < values64.Length; i++)
+                        {
+                            values64[i] = left._vector[i] + right._vector[i];
+                        }
+
+                        return new VectorDouble(values64);
                     }
 
-                    return new VectorDouble(newValues);
+                    Vector128<double>[] blocks128 = null;
+                    Vector256<double>[] blocks256 = null;
+
+                    int remainingSubOperations = size;
+                    int processedSubOperations = 0;
+
+                    if (Avx.IsSupported && remainingSubOperations >= 4)
+                    {
+                        blocks256 = new Vector256<double>[remainingSubOperations >> 2];
+
+                        for (int i = 0; i < blocks256.Length; i++)
+                        {
+                            blocks256[i] = Avx.Add(left._vector.ToVector256(i), right._vector.ToVector256(i));
+                        }
+
+                        remainingSubOperations -= blocks256.Length << 2;
+                        processedSubOperations += blocks256.Length << 2;
+                    }
+
+                    if (remainingSubOperations >= 2)
+                    {
+                        blocks128 = new Vector128<double>[remainingSubOperations >> 1];
+
+                        for (int i = 0, j = processedSubOperations >> 1; i < blocks128.Length; i++, j++)
+                        {
+                            blocks128[i] = Sse2.Add(left._vector.ToVector128(j), right._vector.ToVector128(j));
+                        }
+
+                        remainingSubOperations -= blocks128.Length << 1;
+                        processedSubOperations += blocks128.Length << 1;
+                    }
+
+                    if (remainingSubOperations == 1)
+                    {
+                        return new VectorDouble(size,
+                            left._vector[processedSubOperations] + right._vector[processedSubOperations], blocks128,
+                            blocks256);
+                    }
+
+                    return new VectorDouble(size, value: null, blocks128, blocks256);
             }
         }
 
@@ -352,13 +401,59 @@ namespace Vectors
                             left._vector[3] - right._vector[3]
                         }, 0);
                 default:
-                    double[] newValues = new double[size];
-                    for (int i = 0; i < size; i++)
+                    //Assumption is made that no Sse2 support means no Avx support
+                    if (!Sse2.IsSupported)
                     {
-                        newValues[i] = left._vector[i] - right._vector[i];
+                        double[] values64 = new double[size];
+
+                        for (int i = 0; i < values64.Length; i++)
+                        {
+                            values64[i] = left._vector[i] - right._vector[i];
+                        }
+
+                        return new VectorDouble(values64);
                     }
 
-                    return new VectorDouble(newValues);
+                    Vector128<double>[] blocks128 = null;
+                    Vector256<double>[] blocks256 = null;
+
+                    int remainingSubOperations = size;
+                    int processedSubOperations = 0;
+
+                    if (Avx.IsSupported && remainingSubOperations >= 4)
+                    {
+                        blocks256 = new Vector256<double>[remainingSubOperations >> 2];
+
+                        for (int i = 0; i < blocks256.Length; i++)
+                        {
+                            blocks256[i] = Avx.Subtract(left._vector.ToVector256(i), right._vector.ToVector256(i));
+                        }
+
+                        remainingSubOperations -= blocks256.Length << 2;
+                        processedSubOperations += blocks256.Length << 2;
+                    }
+
+                    if (remainingSubOperations >= 2)
+                    {
+                        blocks128 = new Vector128<double>[remainingSubOperations >> 1];
+
+                        for (int i = 0, j = processedSubOperations >> 1; i < blocks128.Length; i++, j++)
+                        {
+                            blocks128[i] = Sse2.Subtract(left._vector.ToVector128(j), right._vector.ToVector128(j));
+                        }
+
+                        remainingSubOperations -= blocks128.Length << 1;
+                        processedSubOperations += blocks128.Length << 1;
+                    }
+
+                    if (remainingSubOperations == 1)
+                    {
+                        return new VectorDouble(size,
+                            left._vector[processedSubOperations] - right._vector[processedSubOperations], blocks128,
+                            blocks256);
+                    }
+
+                    return new VectorDouble(size, value: null, blocks128, blocks256);
             }
         }
 
@@ -433,13 +528,59 @@ namespace Vectors
                             left._vector[3] * right._vector[3]
                         }, 0);
                 default:
-                    double[] newValues = new double[size];
-                    for (int i = 0; i < size; i++)
+                    //Assumption is made that no Sse2 support means no Avx support
+                    if (!Sse2.IsSupported)
                     {
-                        newValues[i] = left._vector[i] * right._vector[i];
+                        double[] values64 = new double[size];
+
+                        for (int i = 0; i < values64.Length; i++)
+                        {
+                            values64[i] = left._vector[i] * right._vector[i];
+                        }
+
+                        return new VectorDouble(values64);
                     }
 
-                    return new VectorDouble(newValues);
+                    Vector128<double>[] blocks128 = null;
+                    Vector256<double>[] blocks256 = null;
+
+                    int remainingSubOperations = size;
+                    int processedSubOperations = 0;
+
+                    if (Avx.IsSupported && remainingSubOperations >= 4)
+                    {
+                        blocks256 = new Vector256<double>[remainingSubOperations >> 2];
+
+                        for (int i = 0; i < blocks256.Length; i++)
+                        {
+                            blocks256[i] = Avx.Multiply(left._vector.ToVector256(i), right._vector.ToVector256(i));
+                        }
+
+                        remainingSubOperations -= blocks256.Length << 2;
+                        processedSubOperations += blocks256.Length << 2;
+                    }
+
+                    if (remainingSubOperations >= 2)
+                    {
+                        blocks128 = new Vector128<double>[remainingSubOperations >> 1];
+
+                        for (int i = 0, j = processedSubOperations >> 1; i < blocks128.Length; i++, j++)
+                        {
+                            blocks128[i] = Sse2.Multiply(left._vector.ToVector128(j), right._vector.ToVector128(j));
+                        }
+
+                        remainingSubOperations -= blocks128.Length << 1;
+                        processedSubOperations += blocks128.Length << 1;
+                    }
+
+                    if (remainingSubOperations == 1)
+                    {
+                        return new VectorDouble(size,
+                            left._vector[processedSubOperations] * right._vector[processedSubOperations], blocks128,
+                            blocks256);
+                    }
+
+                    return new VectorDouble(size, value: null, blocks128, blocks256);
             }
         }
 
@@ -552,13 +693,59 @@ namespace Vectors
                             left._vector[3] / right._vector[3]
                         }, 0);
                 default:
-                    double[] newValues = new double[size];
-                    for (int i = 0; i < size; i++)
+                    //Assumption is made that no Sse2 support means no Avx support
+                    if (!Sse2.IsSupported)
                     {
-                        newValues[i] = left._vector[i] / right._vector[i];
+                        double[] values64 = new double[size];
+
+                        for (int i = 0; i < values64.Length; i++)
+                        {
+                            values64[i] = left._vector[i] / right._vector[i];
+                        }
+
+                        return new VectorDouble(values64);
                     }
 
-                    return new VectorDouble(newValues);
+                    Vector128<double>[] blocks128 = null;
+                    Vector256<double>[] blocks256 = null;
+
+                    int remainingSubOperations = size;
+                    int processedSubOperations = 0;
+
+                    if (Avx.IsSupported && remainingSubOperations >= 4)
+                    {
+                        blocks256 = new Vector256<double>[remainingSubOperations >> 2];
+
+                        for (int i = 0; i < blocks256.Length; i++)
+                        {
+                            blocks256[i] = Avx.Divide(left._vector.ToVector256(i), right._vector.ToVector256(i));
+                        }
+
+                        remainingSubOperations -= blocks256.Length << 2;
+                        processedSubOperations += blocks256.Length << 2;
+                    }
+
+                    if (remainingSubOperations >= 2)
+                    {
+                        blocks128 = new Vector128<double>[remainingSubOperations >> 1];
+
+                        for (int i = 0, j = processedSubOperations >> 1; i < blocks128.Length; i++, j++)
+                        {
+                            blocks128[i] = Sse2.Divide(left._vector.ToVector128(j), right._vector.ToVector128(j));
+                        }
+
+                        remainingSubOperations -= blocks128.Length << 1;
+                        processedSubOperations += blocks128.Length << 1;
+                    }
+
+                    if (remainingSubOperations == 1)
+                    {
+                        return new VectorDouble(size,
+                            left._vector[processedSubOperations] / right._vector[processedSubOperations], blocks128,
+                            blocks256);
+                    }
+
+                    return new VectorDouble(size, value: null, blocks128, blocks256);
             }
         }
 
@@ -610,7 +797,6 @@ namespace Vectors
                     {
                         Vector128<double> result = Sse2.CompareEqual(left._vector.ToVector128(0), right._vector.ToVector128(0));
                         return Sse2.MoveMask(result) == 0b11 && left._vector[2].Equals(right._vector[2]);
-
                     }
                 case 4 when Sse2.IsSupported:
                     {
@@ -631,13 +817,61 @@ namespace Vectors
                             left._vector[2].Equals(right._vector[2]) &&
                             left._vector[3].Equals(right._vector[3]):
                     return true;
+                //TODO Fix bug that causes all failures above to run this code when they should just return false
                 default:
-                    for (int i = 0; i < size; i++)
+                    //Assumption is made that no Sse2 support means no Avx support
+                    if (!Sse2.IsSupported)
                     {
-                        if (!left._vector[i].Equals(right._vector[i]))
+                        for (int i = 0; i < size; i++)
                         {
-                            return false;
+                            if (!left._vector[i].Equals(right._vector[i]))
+                            {
+                                return false;
+                            }
                         }
+                    }
+
+                    int remainingSubOperations = size;
+                    int processedSubOperations = 0;
+
+                    if (Avx.IsSupported && remainingSubOperations >= 4)
+                    {
+                        int count256 = remainingSubOperations >> 2;
+
+                        for (int i = 0; i < count256; i++)
+                        {
+                            Vector256<double> result = Avx.Compare(left._vector.ToVector256(0), right._vector.ToVector256(0),
+                                FloatComparisonMode.OrderedEqualNonSignaling);
+                            if (Avx.MoveMask(result) != 0b1111)
+                            {
+                                return false;
+                            }
+                        }
+
+                        remainingSubOperations -= count256 << 2;
+                        processedSubOperations += count256 << 2;
+                    }
+
+                    if (remainingSubOperations >= 2)
+                    {
+                        int count128 = remainingSubOperations >> 1;
+
+                        for (int i = 0; i < count128; i++)
+                        {
+                            Vector128<double> result = Sse2.CompareEqual(left._vector.ToVector128(0), right._vector.ToVector128(0));
+                            if (Sse2.MoveMask(result) != 0b11)
+                            {
+                                return false;
+                            }
+                        }
+
+                        remainingSubOperations -= count128 << 1;
+                        processedSubOperations += count128 << 1;
+                    }
+
+                    if (remainingSubOperations == 1)
+                    {
+                        return left._vector[processedSubOperations].Equals(right._vector[processedSubOperations]);
                     }
 
                     return true;
