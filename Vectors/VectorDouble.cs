@@ -820,8 +820,7 @@ namespace Vectors
                             left._vector[2].Equals(right._vector[2]) &&
                             left._vector[3].Equals(right._vector[3]):
                     return true;
-                //TODO Fix bug that causes all failures above to run this code when they should just return false
-                default:
+                case > 4:
                     //Assumption is made that no Sse2 support means no Avx support
                     if (!Sse2.IsSupported)
                     {
@@ -879,6 +878,8 @@ namespace Vectors
 
                     return true;
             }
+
+            return false;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
