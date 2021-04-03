@@ -11,8 +11,6 @@ using System.Text;
 
 namespace Vectors
 {
-    //TODO Make more use of the new mixed argument constructor for 192 and 256 bit Sse2 fallbacks
-    //TODO Add Range indexer, Index?
     public readonly struct VectorDouble : IEquatable<VectorDouble>, IFormattable
     {
         private readonly RegisterDouble _vector;
@@ -56,6 +54,7 @@ namespace Vectors
             {
                 throw new IndexOutOfRangeException();
             }
+
             //TODO Check performance of array[Range], is Span.Splice faster?
             _vector = new RegisterDouble(values[index..]);
         }
@@ -111,6 +110,11 @@ namespace Vectors
         }
 
         public readonly unsafe double this[int index] => _vector[index];
+
+        public readonly VectorDouble Slice(int start, int length)
+        {
+            return new(_vector.Doubles.AsSpan().Slice(start, length));
+        }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public override readonly bool Equals([NotNullWhen(true)] object? obj) =>
@@ -651,8 +655,8 @@ namespace Vectors
                 //Full size vector instructions
                 case 2 when Sse2.IsSupported:
                     return new VectorDouble(Sse2.Divide(left._vector.ToVector128(0), right._vector.ToVector128(0)));
-                case 3 when false&&Avx.IsSupported:
-                case 4 when false&&Avx.IsSupported:
+                case 3 when Avx.IsSupported:
+                case 4 when Avx.IsSupported:
                     return new VectorDouble(Avx.Divide(left._vector.ToVector256(0), right._vector.ToVector256(0)),
                         size);
 
