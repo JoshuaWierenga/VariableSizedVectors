@@ -1,11 +1,10 @@
 ﻿using System;
-using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 
 namespace Vectors
 {
-    //TODO Search for All VectorDouble and RegisterDouble references and update
+    //TODO Search for All VectorDouble and double references and update
 
     //TODO Would it be possible to create a linked list style structure
     //this would allow returning to the old VectorX<double> constructor setup and not need any array like type
@@ -14,14 +13,14 @@ namespace Vectors
         where T : struct
     {
         //TODO Figure out if double[] or ReadOnlySpan<double> is better,
-        //ReadOnlySpan requires ref on VectorDouble which breaks interfaces.
+        //ReadOnlySpan requires ref on Vector which breaks interfaces.
         //I tried ReadOnlyMemory but it does not have a void* constructor
         //if this could be worked around and performance was good ReadOnlyMemory<T>.Span exists.
         internal readonly T[] Values;
 
         //TODO Check if it is possible to make constant vectors different in a way that is detectable at compile time
         //Check if them being static helps, I tried to go for compile time constants but that is not possible with structs
-        //Would it be possible to store them as constant pure data and then at runtime do a one time conversion to a VectorDouble?
+        //Would it be possible to store them as constant pure data and then at runtime do a one time conversion to a Vector?
         internal readonly bool MultiSize;
 
         internal unsafe Register(Vector128<T> values)
@@ -37,9 +36,9 @@ namespace Vectors
             Values = new Span<T>(&values, count).ToArray();
             MultiSize = false;
         }
-        
-        //TODO Rewrite for whatever is needed now as 128 + Unsafe.SizeOf<T>() =/= 192 at all times, only for Double and UInt64
-        //Use Vector64<T>? If so we need another set of cases in what will be Vector<T> to handle mmx
+
+        //TODO Rewrite for whatever is needed now as 128 + Unsafe.SizeOf<T>() =/= 192 at all times, only for Double, Int64 and UInt64
+        //Use Vector64<T>? If so we need another set of cases in Vector<T> to handle mmx
         //Used for Sse2 fallback of hardcoded 192 bit double vectors
         internal Register(Vector128<T> block128, T value)
         {
@@ -73,7 +72,11 @@ namespace Vectors
         {
             if (blocks256 == null && blocks128 == null && value == null)
             {
-                throw new ArgumentNullException();
+                //TODO Revert, this is just temporary to prevent crashes
+                //throw new ArgumentNullException();
+                Values = new T[count];
+                MultiSize = false;
+                return;
             }
 
             int processed = 0;
