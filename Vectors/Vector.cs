@@ -30,19 +30,19 @@ namespace Vectors
         //TODO Fix
         //public static VectorDouble<T> One { get; } = new(1, true);
 
-        //TODO This needed a new way to get all 1's
+        //TODO This needs a new way to get all 1's
         //internal static VectorDouble<T> AllBitsSet { get; } = new(BitConverter.Int64BitsToDouble(-1), true);
 
         private Vector(T value, bool allSizes) => _vector = new Register<T>(value, true);
 
-        private Vector(Vector128<T> values) => _vector = new Register<T>(values);
+        private Vector(Vector128<T> values, int count) => _vector = new Register<T>(values, count);
 
         private Vector(Vector256<T> values, int count) => _vector = new Register<T>(values, count);
 
         //TODO Rewrite for whatever is needed now as 128 + Unsafe.SizeOf<T>() =/= 192 at all times, only for Double, Int64 and UInt64
         //Use Vector64<T>? If so we need another set of cases to handle mmx
         //Used for Sse2 fallback of hardcoded 192 bit double vectors
-        private Vector(Vector128<T> block128, T value) => _vector = new Register<T>(block128, value);
+        //private Vector(Vector128<T> block128, T value) => _vector = new Register<T>(block128, value);
 
         //Used for Sse2 fallback of hardcoded 256 bit vectors
         private Vector(Vector128<T> firstBlock128, Vector128<T> secondBlock128) =>
@@ -83,14 +83,14 @@ namespace Vectors
 
         public readonly void CopyTo(Span<byte> destination)
         {
-            if ((uint)destination.Length < (uint)(_vector.Values.Length * sizeof(double)))
+            if ((uint)destination.Length < (uint)(_vector.Values.Length << BitShiftAmountSizeOf()))
             {
                 throw new ArgumentException();
             }
 
-            //TODO Optimise multiplication to left bitshift
             Unsafe.CopyBlockUnaligned(ref MemoryMarshal.GetReference(destination),
-                ref Unsafe.As<T, byte>(ref _vector.Values[0]), (uint)(_vector.Values.Length * Unsafe.SizeOf<T>()));
+                ref Unsafe.As<T, byte>(ref _vector.Values[0]),
+                (uint)(_vector.Values.Length << BitShiftAmountSizeOf()));
         }
 
         public readonly void CopyTo(Span<T> destination)
@@ -100,9 +100,9 @@ namespace Vectors
                 throw new ArgumentException();
             }
 
-            //TODO Optimise multiplication to left bitshift
             Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(destination)),
-                ref Unsafe.As<T, byte>(ref _vector.Values[0]), (uint)(_vector.Values.Length * Unsafe.SizeOf<T>()));
+                ref Unsafe.As<T, byte>(ref _vector.Values[0]),
+                (uint)(_vector.Values.Length << BitShiftAmountSizeOf()));
         }
 
         public readonly void CopyTo(T[] destination) => CopyTo(destination, 0);
@@ -119,9 +119,9 @@ namespace Vectors
                 throw new ArgumentOutOfRangeException(nameof(startIndex));
             }
 
-            //TODO Optimise multiplication to left bitshift
             Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref destination[startIndex]),
-                ref Unsafe.As<T, byte>(ref _vector.Values[0]), (uint)(_vector.Values.Length * Unsafe.SizeOf<T>()));
+                ref Unsafe.As<T, byte>(ref _vector.Values[0]),
+                (uint)(_vector.Values.Length << BitShiftAmountSizeOf()));
         }
 
         public readonly unsafe T this[int index] => _vector[index];
@@ -163,7 +163,7 @@ namespace Vectors
             sb.Append('<');
             sb.Append(((IFormattable)_vector[0]).ToString(format, formatProvider));
 
-            //TODO Decide if the hardcoded cases should just be inside each other with for loops like case 3-4 or as they are now
+            //TODO Decide if the hardcoded cases should be inside each other with if statements like case 3-4 or kept separate as they are now
             switch (_vector.Values.Length)
             {
                 case 1:
@@ -205,14 +205,14 @@ namespace Vectors
 
         public readonly bool TryCopyTo(Span<byte> destination)
         {
-            if ((uint)destination.Length < (uint)_vector.Values.Length * sizeof(double))
+            if ((uint)destination.Length < (uint)_vector.Values.Length << BitShiftAmountSizeOf())
             {
                 return false;
             }
 
-            //TODO Optimise multiplication to left bitshift
             Unsafe.CopyBlockUnaligned(ref MemoryMarshal.GetReference(destination),
-                ref Unsafe.As<T, byte>(ref _vector.Values[0]), (uint)(_vector.Values.Length * Unsafe.SizeOf<T>()));
+                ref Unsafe.As<T, byte>(ref _vector.Values[0]),
+                (uint)(_vector.Values.Length << BitShiftAmountSizeOf()));
             return true;
         }
 
@@ -223,9 +223,9 @@ namespace Vectors
                 return false;
             }
 
-            //TODO Optimise multiplication to left bitshift
             Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(destination)),
-                ref Unsafe.As<T, byte>(ref _vector.Values[0]), (uint)(_vector.Values.Length * Unsafe.SizeOf<T>()));
+                ref Unsafe.As<T, byte>(ref _vector.Values[0]),
+                (uint)(_vector.Values.Length << BitShiftAmountSizeOf()));
             return true;
         }
 
@@ -898,5 +898,57 @@ namespace Vectors
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool operator !=(Vector<T> left, Vector<T> right) => !(left == right);
+
+
+        //This is the result of log_2(Unsafe.SizeOf<T>) and is designed to be used
+        //as "a << BitShiftAmountSizeOf()" wherever "a * Unsafe.SizeOf<T>()" might be used
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int BitShiftAmountSizeOf()
+        {
+            if (typeof(T) == typeof(byte))
+            {
+                return 0;
+            }
+            else if (typeof(T) == typeof(sbyte))
+            {
+                return 0;
+            }
+            else if (typeof(T) == typeof(ushort))
+            {
+                return 1;
+            }
+            else if (typeof(T) == typeof(short))
+            {
+                return 1;
+            }
+            else if (typeof(T) == typeof(uint))
+            {
+                return 2;
+            }
+            else if (typeof(T) == typeof(int))
+            {
+                return 2;
+            }
+            else if (typeof(T) == typeof(ulong))
+            {
+                return 3;
+            }
+            else if (typeof(T) == typeof(long))
+            {
+                return 3;
+            }
+            else if (typeof(T) == typeof(float))
+            {
+                return 2;
+            }
+            else if (typeof(T) == typeof(double))
+            {
+                return 3;
+            }
+            else
+            {
+                throw new NotSupportedException();
+            }
+        }
     }
 }

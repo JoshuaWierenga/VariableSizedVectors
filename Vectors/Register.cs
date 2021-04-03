@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 
@@ -23,10 +23,10 @@ namespace Vectors
         //Would it be possible to store them as constant pure data and then at runtime do a one time conversion to a Vector?
         internal readonly bool MultiSize;
 
-        internal unsafe Register(Vector128<T> values)
+        internal unsafe Register(Vector128<T> values, int count)
         {
             //TODO Check if Unsafe.WriteUnaligned would be faster
-            Values = new Span<T>(&values, 2).ToArray();
+            Values = new Span<T>(&values, count).ToArray();
             MultiSize = false;
         }
 
@@ -40,17 +40,17 @@ namespace Vectors
         //TODO Rewrite for whatever is needed now as 128 + Unsafe.SizeOf<T>() =/= 192 at all times, only for Double, Int64 and UInt64
         //Use Vector64<T>? If so we need another set of cases in Vector<T> to handle mmx
         //Used for Sse2 fallback of hardcoded 192 bit double vectors
-        internal Register(Vector128<T> block128, T value)
+        /*internal Register(Vector128<T> block128, T value)
         {
             //TODO Test
-            Values = new T[Vector128<double>.Count + 1];
+            Values = new T[Vector128<T>.Count + 1];
 
             Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref Values[0]),
                 ref Unsafe.As<Vector128<T>, byte>(ref block128), 16);
             Values[2] = value;
 
             MultiSize = false;
-        }
+        }*/
 
         //Used for Sse2 fallback of hardcoded 256 bit vectors
         internal Register(Vector128<T> firstBlock128, Vector128<T> secondBlock128)
@@ -158,6 +158,7 @@ namespace Vectors
         //Used to compute the number of values in an array of Vector128<T>s
         //Provided I understand how AggressiveInlining and typeof work, this should be reduced to a single
         //result and inlined at compile time for every instance of this class
+        //This is the result of log_2(128/Unsafe.SizeOf<T> / 8)
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int BitShiftAmount128Bit()
         {
@@ -208,6 +209,7 @@ namespace Vectors
         }
 
         //See above comment. Used to compute the number of values in an array of Vector256<T>s
+        //This is the result of log_2(256/(Unsafe.SizeOf<T>*8))
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int BitShiftAmount256Bit()
         {
@@ -257,7 +259,9 @@ namespace Vectors
             }
         }
 
-        //See above comment. Used to compute the number of values in an array of Vector256<T>s
+        //TODO Use or Remove
+        //This is the result of 256/(Unsafe.SizeOf<T>*8)
+        /*[MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int NumberIn256Bits()
         {
             if (typeof(T) == typeof(byte))
@@ -304,6 +308,6 @@ namespace Vectors
             {
                 throw new NotSupportedException();
             }
-        }
+        }*/
     }
 }
