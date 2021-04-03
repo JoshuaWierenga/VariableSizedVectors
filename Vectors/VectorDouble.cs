@@ -13,9 +13,9 @@ namespace Vectors
 {
     public readonly struct VectorDouble : IEquatable<VectorDouble>, IFormattable
     {
-        private readonly RegisterDouble _vector;
+        private readonly Register<double> _vector;
 
-        public readonly int Length => _vector.Doubles.Length;
+        public readonly int Length => _vector.Values.Length;
 
         public static VectorDouble Zero { get; } = new(0, true);
 
@@ -23,23 +23,23 @@ namespace Vectors
 
         internal static VectorDouble AllBitsSet { get; } = new(BitConverter.Int64BitsToDouble(-1), true);
 
-        private VectorDouble(double value, bool allSizes) => _vector = new RegisterDouble(value, true);
+        private VectorDouble(double value, bool allSizes) => _vector = new Register<double>(value, true);
 
-        private VectorDouble(Vector128<double> values) => _vector = new RegisterDouble(values);
+        private VectorDouble(Vector128<double> values) => _vector = new Register<double>(values);
 
-        private VectorDouble(Vector256<double> values, int count) => _vector = new RegisterDouble(values, count);
+        private VectorDouble(Vector256<double> values, int count) => _vector = new Register<double>(values, count);
 
         //Used for Sse2 fallback of hardcoded 192 bit double vectors
-        private VectorDouble(Vector128<double> block128, double value) => _vector = new RegisterDouble(block128, value);
+        private VectorDouble(Vector128<double> block128, double value) => _vector = new Register<double>(block128, value);
 
         //Used for Sse2 fallback of hardcoded 256 bit double vectors
         private VectorDouble(Vector128<double> firstBlock128, Vector128<double> secondBlock128) =>
-            _vector = new RegisterDouble(firstBlock128, secondBlock128);
+            _vector = new Register<double>(firstBlock128, secondBlock128);
 
         private VectorDouble(int count, double? value = null, Vector128<double>[] blocks128 = null,
-            Vector256<double>[] blocks256 = null) => _vector = new RegisterDouble(count, value, blocks128, blocks256);
+            Vector256<double>[] blocks256 = null) => _vector = new Register<double>(count, value, blocks128, blocks256);
 
-        public VectorDouble(double value) => _vector = new RegisterDouble(value);
+        public VectorDouble(double value) => _vector = new Register<double>(value);
 
         public VectorDouble(double[] values) : this(values, 0) { }
 
@@ -56,39 +56,39 @@ namespace Vectors
             }
 
             //TODO Check performance of array[Range], is Span.Splice faster?
-            _vector = new RegisterDouble(values[index..]);
+            _vector = new Register<double>(values[index..]);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public VectorDouble(ReadOnlySpan<byte> values) =>
-            _vector = new RegisterDouble(MemoryMarshal.Cast<byte, double>(values).ToArray());
+            _vector = new Register<double>(MemoryMarshal.Cast<byte, double>(values).ToArray());
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public VectorDouble(ReadOnlySpan<double> values) => _vector = new RegisterDouble(values.ToArray());
+        public VectorDouble(ReadOnlySpan<double> values) => _vector = new Register<double>(values.ToArray());
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public VectorDouble(Span<double> values) : this((ReadOnlySpan<double>)values) { }
 
         public readonly void CopyTo(Span<byte> destination)
         {
-            if ((uint)destination.Length < (uint)(_vector.Doubles.Length * sizeof(double)))
+            if ((uint)destination.Length < (uint)(_vector.Values.Length * sizeof(double)))
             {
                 throw new ArgumentException();
             }
 
             Unsafe.CopyBlockUnaligned(ref MemoryMarshal.GetReference(destination),
-                ref Unsafe.As<double, byte>(ref _vector.Doubles[0]), (uint)(_vector.Doubles.Length * sizeof(double)));
+                ref Unsafe.As<double, byte>(ref _vector.Values[0]), (uint)(_vector.Values.Length * sizeof(double)));
         }
 
         public readonly void CopyTo(Span<double> destination)
         {
-            if ((uint)destination.Length < (uint)_vector.Doubles.Length)
+            if ((uint)destination.Length < (uint)_vector.Values.Length)
             {
                 throw new ArgumentException();
             }
 
             Unsafe.CopyBlockUnaligned(ref Unsafe.As<double, byte>(ref MemoryMarshal.GetReference(destination)),
-                ref Unsafe.As<double, byte>(ref _vector.Doubles[0]), (uint)(_vector.Doubles.Length * sizeof(double)));
+                ref Unsafe.As<double, byte>(ref _vector.Values[0]), (uint)(_vector.Values.Length * sizeof(double)));
         }
 
         public readonly void CopyTo(double[] destination) => CopyTo(destination, 0);
@@ -106,14 +106,14 @@ namespace Vectors
             }
 
             Unsafe.CopyBlockUnaligned(ref Unsafe.As<double, byte>(ref destination[startIndex]),
-                ref Unsafe.As<double, byte>(ref _vector.Doubles[0]), (uint)(_vector.Doubles.Length * sizeof(double)));
+                ref Unsafe.As<double, byte>(ref _vector.Values[0]), (uint)(_vector.Values.Length * sizeof(double)));
         }
 
         public readonly unsafe double this[int index] => _vector[index];
 
         public readonly VectorDouble Slice(int start, int length)
         {
-            return new(_vector.Doubles.AsSpan().Slice(start, length));
+            return new(_vector.Values.AsSpan().Slice(start, length));
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -124,14 +124,14 @@ namespace Vectors
 
         public override readonly int GetHashCode()
         {
-            if (_vector.Doubles.Length == 1)
+            if (_vector.Values.Length == 1)
             {
                 return _vector[0].GetHashCode();
             }
 
             HashCode hashCode = default;
 
-            for (int i = 0; i < _vector.Doubles.Length; i++)
+            for (int i = 0; i < _vector.Values.Length; i++)
             {
                 hashCode.Add(_vector[i]);
             }
@@ -151,7 +151,7 @@ namespace Vectors
             sb.Append('<');
             sb.Append(_vector[0].ToString(format, formatProvider));
 
-            switch (_vector.Doubles.Length)
+            switch (_vector.Values.Length)
             {
                 case 1:
                     break;
@@ -168,7 +168,7 @@ namespace Vectors
                     sb.Append(NumberFormatInfo.GetInstance(formatProvider).NumberGroupSeparator);
                     sb.Append(' ');
                     sb.Append(_vector[2].ToString(format, formatProvider));
-                    if (_vector.Doubles.Length == 4)
+                    if (_vector.Values.Length == 4)
                     {
                         sb.Append(NumberFormatInfo.GetInstance(formatProvider).NumberGroupSeparator);
                         sb.Append(' ');
@@ -177,13 +177,12 @@ namespace Vectors
                     break;
 
                 default:
-                    for (int i = 1; i < _vector.Doubles.Length; i++)
+                    for (int i = 1; i < _vector.Values.Length; i++)
                     {
                         sb.Append(separator);
                         sb.Append(' ');
                         sb.Append(_vector[i].ToString(format, formatProvider));
                     }
-
                     break;
             }
 
@@ -195,25 +194,25 @@ namespace Vectors
 
         public readonly bool TryCopyTo(Span<byte> destination)
         {
-            if ((uint)destination.Length < (uint)_vector.Doubles.Length * sizeof(double))
+            if ((uint)destination.Length < (uint)_vector.Values.Length * sizeof(double))
             {
                 return false;
             }
 
             Unsafe.CopyBlockUnaligned(ref MemoryMarshal.GetReference(destination),
-                ref Unsafe.As<double, byte>(ref _vector.Doubles[0]), (uint)(_vector.Doubles.Length * sizeof(double)));
+                ref Unsafe.As<double, byte>(ref _vector.Values[0]), (uint)(_vector.Values.Length * sizeof(double)));
             return true;
         }
 
         public readonly bool TryCopyTo(Span<double> destination)
         {
-            if ((uint)destination.Length < (uint)_vector.Doubles.Length)
+            if ((uint)destination.Length < (uint)_vector.Values.Length)
             {
                 return false;
             }
 
             Unsafe.CopyBlockUnaligned(ref Unsafe.As<double, byte>(ref MemoryMarshal.GetReference(destination)),
-                ref Unsafe.As<double, byte>(ref _vector.Doubles[0]), (uint)(_vector.Doubles.Length * sizeof(double)));
+                ref Unsafe.As<double, byte>(ref _vector.Values[0]), (uint)(_vector.Values.Length * sizeof(double)));
             return true;
         }
 
@@ -224,19 +223,19 @@ namespace Vectors
 
             if (left._vector.MultiSize)
             {
-                size = right._vector.Doubles.Length;
+                size = right._vector.Values.Length;
             }
             else if (right._vector.MultiSize)
             {
-                size = left._vector.Doubles.Length;
+                size = left._vector.Values.Length;
             }
-            else if (left._vector.Doubles.Length != right._vector.Doubles.Length)
+            else if (left._vector.Values.Length != right._vector.Values.Length)
             {
                 throw new IndexOutOfRangeException();
             }
             else
             {
-                size = left._vector.Doubles.Length;
+                size = left._vector.Values.Length;
             }
 
             switch (size)
@@ -347,19 +346,19 @@ namespace Vectors
 
             if (left._vector.MultiSize)
             {
-                size = right._vector.Doubles.Length;
+                size = right._vector.Values.Length;
             }
             else if (right._vector.MultiSize)
             {
-                size = left._vector.Doubles.Length;
+                size = left._vector.Values.Length;
             }
-            else if (left._vector.Doubles.Length != right._vector.Doubles.Length)
+            else if (left._vector.Values.Length != right._vector.Values.Length)
             {
                 throw new IndexOutOfRangeException();
             }
             else
             {
-                size = left._vector.Doubles.Length;
+                size = left._vector.Values.Length;
             }
 
             switch (size)
@@ -472,19 +471,19 @@ namespace Vectors
 
             if (left._vector.MultiSize)
             {
-                size = right._vector.Doubles.Length;
+                size = right._vector.Values.Length;
             }
             else if (right._vector.MultiSize)
             {
-                size = left._vector.Doubles.Length;
+                size = left._vector.Values.Length;
             }
-            else if (left._vector.Doubles.Length != right._vector.Doubles.Length)
+            else if (left._vector.Values.Length != right._vector.Values.Length)
             {
                 throw new IndexOutOfRangeException();
             }
             else
             {
-                size = left._vector.Doubles.Length;
+                size = left._vector.Values.Length;
             }
 
             switch (size)
@@ -593,7 +592,7 @@ namespace Vectors
         public static VectorDouble operator *(VectorDouble value, double factor)
         {
             //TODO Add Sse2/Avx support? Requires broadcasting factor to a vector and then multiplying with full/partial size vector instruction support
-            switch (value._vector.Doubles.Length)
+            switch (value._vector.Values.Length)
             {
                 case 1:
                     return new VectorDouble(value._vector[0] * factor);
@@ -615,8 +614,8 @@ namespace Vectors
                             value._vector[2] * factor, value._vector[3] * factor
                         }, 0);
                 default:
-                    double[] newValues = new double[value._vector.Doubles.Length];
-                    for (int i = 0; i < value._vector.Doubles.Length; i++)
+                    double[] newValues = new double[value._vector.Values.Length];
+                    for (int i = 0; i < value._vector.Values.Length; i++)
                     {
                         newValues[i] = value._vector[i] * factor;
                     }
@@ -635,19 +634,19 @@ namespace Vectors
 
             if (left._vector.MultiSize)
             {
-                size = right._vector.Doubles.Length;
+                size = right._vector.Values.Length;
             }
             else if (right._vector.MultiSize)
             {
-                size = left._vector.Doubles.Length;
+                size = left._vector.Values.Length;
             }
-            else if (left._vector.Doubles.Length != right._vector.Doubles.Length)
+            else if (left._vector.Values.Length != right._vector.Values.Length)
             {
                 throw new IndexOutOfRangeException();
             }
             else
             {
-                size = left._vector.Doubles.Length;
+                size = left._vector.Values.Length;
             }
 
             switch (size)
@@ -764,19 +763,19 @@ namespace Vectors
 
             if (left._vector.MultiSize)
             {
-                size = right._vector.Doubles.Length;
+                size = right._vector.Values.Length;
             }
             else if (right._vector.MultiSize)
             {
-                size = left._vector.Doubles.Length;
+                size = left._vector.Values.Length;
             }
-            else if (left._vector.Doubles.Length != right._vector.Doubles.Length)
+            else if (left._vector.Values.Length != right._vector.Values.Length)
             {
                 throw new IndexOutOfRangeException();
             }
             else
             {
-                size = left._vector.Doubles.Length;
+                size = left._vector.Values.Length;
             }
 
             switch (size)
