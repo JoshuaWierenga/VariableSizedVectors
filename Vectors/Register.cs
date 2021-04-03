@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.CompilerServices;
 using System.Runtime.Intrinsics;
 
@@ -23,6 +23,12 @@ namespace Vectors
         //Would it be possible to store them as constant pure data and then at runtime do a one time conversion to a Vector?
         internal readonly bool MultiSize;
 
+        private Register(int count)
+        {
+            Values = new T[count];
+            MultiSize = false;
+        }
+
         internal unsafe Register(Vector128<T> values, int count)
         {
             //TODO Check if Unsafe.WriteUnaligned would be faster
@@ -30,11 +36,15 @@ namespace Vectors
             MultiSize = false;
         }
 
-        internal unsafe Register(Vector256<T> values, int count)
+        //Needed since x86 vector extension operations cannot handle Vector256<T> only Vector256<SomeTypeHere>, at least in c#
+        //This function takes the result in terms of some hardcoded type U and casts it back to the general T to get around this
+        internal static Register<T> Create<U>(Vector256<U> values, int count) where U : struct
         {
-            //TODO Check if Unsafe.WriteUnaligned would be faster
-            Values = new Span<T>(&values, count).ToArray();
-            MultiSize = false;
+            Register<T> register = new(count);
+            Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref register.Values[0]),
+                ref Unsafe.As<Vector256<U>, byte>(ref values), (uint) (count << BitShiftHelpers.SizeOf<T>()));
+
+            return register;
         }
 
         //TODO Rewrite for whatever is needed now as 128 + Unsafe.SizeOf<T>() =/= 192 at all times, only for Double, Int64 and UInt64
@@ -135,18 +145,21 @@ namespace Vectors
         }
 
         //TODO Decide if this should work as it does now and return adjacent vectors or should they overlap such that
-        //TODO Decide if these need bounds checking for non constants, provided at least one value in the subvector
-        //exists, Unsafe.As will return a valid vector but it normally contains mostly junk and may lead to crashes
         //the index has to increase by 2/4 to get an adjacent vector
+        //TODO Decide if these need bounds checking for non constants. Provided at least some values in the subvector
+        //exists but no all, Unsafe.As will still will return a valid vector but it will contain mostly junk and may
+        //lead to crashes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal Vector128<T> ToVector128(int index) => MultiSize
             ? Unsafe.As<T, Vector128<T>>(ref Values[0])
             : Unsafe.As<T, Vector128<T>>(ref Values[index << 1]);
 
+        //Needed since x86 vector extension operations cannot handle Vector256<T> only Vector256<SomeTypeHere>, at least in c#
+        //This function creates Vector256's in terms of a given type U to get around this
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal Vector256<T> ToVector256(int index) => MultiSize
-            ? Unsafe.As<T, Vector256<T>>(ref Values[0])
-            : Unsafe.As<T, Vector256<T>>(ref Values[index << 2]);
+        internal Vector256<U> ToVector256<U>(int index) where U : struct => MultiSize
+            ? Unsafe.As<T, Vector256<U>>(ref Values[0])
+            : Unsafe.As<T, Vector256<U>>(ref Values[index << 2]);
 
         internal T this[int index]
         {
@@ -260,8 +273,58 @@ namespace Vectors
         }
 
         //TODO Use or Remove
-        //This is the result of 256/(Unsafe.SizeOf<T>*8)
+        //This is the result of 128/(Unsafe.SizeOf<T>*8)
         /*[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int NumberIn128Bits()
+        {
+            if (typeof(T) == typeof(byte))
+            {
+                return 16;
+            }
+            else if (typeof(T) == typeof(sbyte))
+            {
+                return 16;
+            }
+            else if (typeof(T) == typeof(ushort))
+            {
+                return 8;
+            }
+            else if (typeof(T) == typeof(short))
+            {
+                return 8;
+            }
+            else if (typeof(T) == typeof(uint))
+            {
+                return 4;
+            }
+            else if (typeof(T) == typeof(int))
+            {
+                return 4;
+            }
+            else if (typeof(T) == typeof(ulong))
+            {
+                return 2;
+            }
+            else if (typeof(T) == typeof(long))
+            {
+                return 2;
+            }
+            else if (typeof(T) == typeof(float))
+            {
+                return 4;
+            }
+            else if (typeof(T) == typeof(double))
+            {
+                return 2;
+            }
+            else
+            {
+                throw new NotSupportedException();
+            }
+        }
+
+        //This is the result of 256/(Unsafe.SizeOf<T>*8)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int NumberIn256Bits()
         {
             if (typeof(T) == typeof(byte))

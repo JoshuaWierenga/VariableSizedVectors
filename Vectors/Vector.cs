@@ -37,7 +37,7 @@ namespace Vectors
 
         private Vector(Vector128<T> values, int count) => _vector = new Register<T>(values, count);
 
-        private Vector(Vector256<T> values, int count) => _vector = new Register<T>(values, count);
+        private Vector(Register<T> register) => _vector = register;
 
         //TODO Rewrite for whatever is needed now as 128 + Unsafe.SizeOf<T>() =/= 192 at all times, only for Double, Int64 and UInt64
         //Use Vector64<T>? If so we need another set of cases to handle mmx
@@ -81,16 +81,20 @@ namespace Vectors
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Vector(Span<T> values) : this((ReadOnlySpan<T>)values) { }
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Vector<T> Create<U>(Vector256<U> values, int count) where U : struct =>
+            new(Register<T>.Create(values, count));
+
         public readonly void CopyTo(Span<byte> destination)
         {
-            if ((uint)destination.Length < (uint)(_vector.Values.Length << BitShiftAmountSizeOf()))
+            if ((uint)destination.Length < (uint)(_vector.Values.Length << BitShiftHelpers.SizeOf<T>()))
             {
                 throw new ArgumentException();
             }
 
             Unsafe.CopyBlockUnaligned(ref MemoryMarshal.GetReference(destination),
                 ref Unsafe.As<T, byte>(ref _vector.Values[0]),
-                (uint)(_vector.Values.Length << BitShiftAmountSizeOf()));
+                (uint) (_vector.Values.Length << BitShiftHelpers.SizeOf<T>()));
         }
 
         public readonly void CopyTo(Span<T> destination)
@@ -102,7 +106,7 @@ namespace Vectors
 
             Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(destination)),
                 ref Unsafe.As<T, byte>(ref _vector.Values[0]),
-                (uint)(_vector.Values.Length << BitShiftAmountSizeOf()));
+                (uint)(_vector.Values.Length << BitShiftHelpers.SizeOf<T>()));
         }
 
         public readonly void CopyTo(T[] destination) => CopyTo(destination, 0);
@@ -121,7 +125,7 @@ namespace Vectors
 
             Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref destination[startIndex]),
                 ref Unsafe.As<T, byte>(ref _vector.Values[0]),
-                (uint)(_vector.Values.Length << BitShiftAmountSizeOf()));
+                (uint)(_vector.Values.Length << BitShiftHelpers.SizeOf<T>()));
         }
 
         public readonly unsafe T this[int index] => _vector[index];
@@ -205,14 +209,14 @@ namespace Vectors
 
         public readonly bool TryCopyTo(Span<byte> destination)
         {
-            if ((uint)destination.Length < (uint)_vector.Values.Length << BitShiftAmountSizeOf())
+            if ((uint)destination.Length < (uint)_vector.Values.Length << BitShiftHelpers.SizeOf<T>())
             {
                 return false;
             }
 
             Unsafe.CopyBlockUnaligned(ref MemoryMarshal.GetReference(destination),
                 ref Unsafe.As<T, byte>(ref _vector.Values[0]),
-                (uint)(_vector.Values.Length << BitShiftAmountSizeOf()));
+                (uint)(_vector.Values.Length << BitShiftHelpers.SizeOf<T>()));
             return true;
         }
 
@@ -225,23 +229,24 @@ namespace Vectors
 
             Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(destination)),
                 ref Unsafe.As<T, byte>(ref _vector.Values[0]),
-                (uint)(_vector.Values.Length << BitShiftAmountSizeOf()));
+                (uint)(_vector.Values.Length << BitShiftHelpers.SizeOf<T>()));
             return true;
         }
 
         //Operators
-        //TODO Add typeof check function to hardcode operations for different types
+        //TODO Finish typeof check function to hardcode operations for different types
+        //TODO Update vector size used depending on type size, currently 256 bit is used for all 4 length arrays
         public static Vector<T> operator +(Vector<T> left, Vector<T> right)
         {
-            int size;
+            int count;
 
             if (left._vector.MultiSize)
             {
-                size = right._vector.Values.Length;
+                count = right._vector.Values.Length;
             }
             else if (right._vector.MultiSize)
             {
-                size = left._vector.Values.Length;
+                count = left._vector.Values.Length;
             }
             else if (left._vector.Values.Length != right._vector.Values.Length)
             {
@@ -249,17 +254,21 @@ namespace Vectors
             }
             else
             {
-                size = left._vector.Values.Length;
+                count = left._vector.Values.Length;
             }
 
-            switch (size)
+            switch (count)
             {
                 //Full size vector instructions
                 case 2 when Sse2.IsSupported:
-                //return new Vector<T>(Sse2.Add(left._vector.ToVector128(0), right._vector.ToVector128(0)));
+                    //return new Vector<T>(Sse2.Add(left._vector.ToVector128(0), right._vector.ToVector128(0)));
+                    break;
                 case 3 when Avx.IsSupported:
+                    break;
+                //TODO Remove the Avx restriction?
                 case 4 when Avx.IsSupported:
-                //return new Vector<T>(Avx.Add(left._vector.ToVector256(0), right._vector.ToVector256(0)), size);
+                    return Add(left, right, 0, count);
+
 
                 //Partial size vector instructions
                 case 3 when Sse2.IsSupported:
@@ -301,7 +310,7 @@ namespace Vectors
                     //Assumption is made that no Sse2 support means no Avx support
                     if (!Sse2.IsSupported)
                     {
-                        T[] values64 = new T[size];
+                        T[] values64 = new T[count];
 
                         for (int i = 0; i < values64.Length; i++)
                         {
@@ -314,7 +323,7 @@ namespace Vectors
                     Vector128<T>[] blocks128 = null;
                     Vector256<T>[] blocks256 = null;
 
-                    int remainingSubOperations = size;
+                    int remainingSubOperations = count;
                     int processedSubOperations = 0;
 
                     if (Avx.IsSupported && remainingSubOperations >= 4)
@@ -350,8 +359,10 @@ namespace Vectors
                             blocks256);*/
                     }
 
-                    return new Vector<T>(size, value: null, blocks128, blocks256);
+                    return new Vector<T>(count, value: null, blocks128, blocks256);
             }
+
+            return new Vector<T>(1);
         }
 
         public static Vector<T> operator -(Vector<T> left, Vector<T> right)
@@ -900,55 +911,108 @@ namespace Vectors
         public static bool operator !=(Vector<T> left, Vector<T> right) => !(left == right);
 
 
-        //This is the result of log_2(Unsafe.SizeOf<T>) and is designed to be used
-        //as "a << BitShiftAmountSizeOf()" wherever "a * Unsafe.SizeOf<T>()" might be used
+        //This method performs addition of the vectors left and right.
+        //If x86 vector extensions are supported then this method first handles the conversion of Vector<T>s to some
+        //intermediate VectorX<U> where X is 128 or 256 and U is the same as T but has to be named differently to get
+        //around c#'s restriction of x86 vector extension operations to be in terms of concrete types.
+        //It then performs addition using Avx or Avx2 if supported and then casts the resulting VectorX<U> to a new
+        //Vector<T> object that is then returned.
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int BitShiftAmountSizeOf()
+        private static Vector<T> Add(Vector<T> left, Vector<T> right, int index, int count)
         {
             if (typeof(T) == typeof(byte))
             {
-                return 0;
+                if (Avx2.IsSupported)
+                {
+                    return Create(
+                        Avx2.Add(left._vector.ToVector256<byte>(index), right._vector.ToVector256<byte>(index)), count);
+                }
             }
             else if (typeof(T) == typeof(sbyte))
             {
-                return 0;
+                if (Avx2.IsSupported)
+                {
+                    return Create(
+                        Avx2.Add(left._vector.ToVector256<sbyte>(index), right._vector.ToVector256<sbyte>(index)),
+                        count);
+                }
             }
             else if (typeof(T) == typeof(ushort))
             {
-                return 1;
+                if (Avx2.IsSupported)
+                {
+                    return Create(
+                        Avx2.Add(left._vector.ToVector256<ushort>(index), right._vector.ToVector256<ushort>(index)),
+                        count);
+                }
             }
             else if (typeof(T) == typeof(short))
             {
-                return 1;
+                if (Avx2.IsSupported)
+                {
+                    return Create(
+                        Avx2.Add(left._vector.ToVector256<short>(index), right._vector.ToVector256<short>(index)),
+                        count);
+                }
             }
             else if (typeof(T) == typeof(uint))
             {
-                return 2;
+                if (Avx2.IsSupported)
+                {
+                    return Create(
+                        Avx2.Add(left._vector.ToVector256<uint>(index), right._vector.ToVector256<uint>(index)), count);
+                }
             }
             else if (typeof(T) == typeof(int))
             {
-                return 2;
+                if (Avx2.IsSupported)
+                {
+                    return Create(Avx2.Add(left._vector.ToVector256<int>(index), right._vector.ToVector256<int>(index)),
+                        count);
+                }
             }
             else if (typeof(T) == typeof(ulong))
             {
-                return 3;
+                if (Avx2.IsSupported)
+                {
+                    return Create(
+                        Avx2.Add(left._vector.ToVector256<ulong>(index), right._vector.ToVector256<ulong>(index)),
+                        count);
+                }
             }
             else if (typeof(T) == typeof(long))
             {
-                return 3;
+                if (Avx2.IsSupported)
+                {
+                    return Create(
+                        Avx2.Add(left._vector.ToVector256<long>(index), right._vector.ToVector256<long>(index)), count);
+                }
             }
             else if (typeof(T) == typeof(float))
             {
-                return 2;
+                if (Avx.IsSupported)
+                {
+                    return Create(
+                        Avx.Add(left._vector.ToVector256<float>(index), right._vector.ToVector256<float>(index)),
+                        count);
+                }
             }
             else if (typeof(T) == typeof(double))
             {
-                return 3;
+                if (Avx.IsSupported)
+                {
+                    return Create(
+                        Avx.Add(left._vector.ToVector256<double>(index), right._vector.ToVector256<double>(index)),
+                        count);
+                }
             }
             else
             {
                 throw new NotSupportedException();
             }
+
+            //TODO Remove
+            return new Vector<T>(1);
         }
     }
 }
