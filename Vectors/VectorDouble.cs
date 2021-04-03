@@ -31,6 +31,13 @@ namespace Vectors
 
         private VectorDouble(Vector256<double> values, int count) => _vector = new RegisterDouble(values, count);
 
+        //Used for Sse2 fallback of hardcoded 192 bit double vectors
+        private VectorDouble(Vector128<double> block128, double value) => _vector = new RegisterDouble(block128, value);
+
+        //Used for Sse2 fallback of hardcoded 256 bit double vectors
+        private VectorDouble(Vector128<double> firstBlock128, Vector128<double> secondBlock128) =>
+            _vector = new RegisterDouble(firstBlock128, secondBlock128);
+
         private VectorDouble(int count, double? value = null, Vector128<double>[] blocks128 = null,
             Vector256<double>[] blocks256 = null) => _vector = new RegisterDouble(count, value, blocks128, blocks256);
 
@@ -239,13 +246,11 @@ namespace Vectors
 
                 //Partial size vector instructions
                 case 3 when Sse2.IsSupported:
-                    return new VectorDouble(
-                        Vector256.Create(Sse2.Add(left._vector.ToVector128(0), right._vector.ToVector128(0)),
-                            Vector128.CreateScalarUnsafe(left._vector[2] + right._vector[2])), size);
+                    return new VectorDouble(Sse2.Add(left._vector.ToVector128(0), right._vector.ToVector128(0)),
+                        left._vector[2] + right._vector[2]);
                 case 4 when Sse2.IsSupported:
-                    return new VectorDouble(
-                        Vector256.Create(Sse2.Add(left._vector.ToVector128(0), right._vector.ToVector128(0)),
-                            Sse2.Add(left._vector.ToVector128(1), right._vector.ToVector128(1))), size);
+                    return new VectorDouble(Sse2.Add(left._vector.ToVector128(0), right._vector.ToVector128(0)),
+                            Sse2.Add(left._vector.ToVector128(1), right._vector.ToVector128(1)));
 
                 //Software fallback
                 case 1:
@@ -365,13 +370,11 @@ namespace Vectors
 
                 //Partial size vector instructions
                 case 3 when Sse2.IsSupported:
-                    return new VectorDouble(
-                        Vector256.Create(Sse2.Subtract(left._vector.ToVector128(0), right._vector.ToVector128(0)),
-                            Vector128.CreateScalarUnsafe(left._vector[2] - right._vector[2])), size);
+                    return new VectorDouble(Sse2.Subtract(left._vector.ToVector128(0), right._vector.ToVector128(0)),
+                        left._vector[2] - right._vector[2]);
                 case 4 when Sse2.IsSupported:
-                    return new VectorDouble(
-                        Vector256.Create(Sse2.Subtract(left._vector.ToVector128(0), right._vector.ToVector128(0)),
-                            Sse2.Subtract(left._vector.ToVector128(1), right._vector.ToVector128(1))), size);
+                    return new VectorDouble(Sse2.Subtract(left._vector.ToVector128(0), right._vector.ToVector128(0)),
+                        Sse2.Subtract(left._vector.ToVector128(1), right._vector.ToVector128(1)));
 
                 //Software fallback
                 case 1:
@@ -492,13 +495,11 @@ namespace Vectors
 
                 //Partial size vector instructions
                 case 3 when Sse2.IsSupported:
-                    return new VectorDouble(
-                        Vector256.Create(Sse2.Multiply(left._vector.ToVector128(0), right._vector.ToVector128(0)),
-                            Vector128.CreateScalarUnsafe(left._vector[2] * right._vector[2])), size);
+                    return new VectorDouble(Sse2.Multiply(left._vector.ToVector128(0), right._vector.ToVector128(0)),
+                        left._vector[2] * right._vector[2]);
                 case 4 when Sse2.IsSupported:
-                    return new VectorDouble(
-                        Vector256.Create(Sse2.Multiply(left._vector.ToVector128(0), right._vector.ToVector128(0)),
-                            Sse2.Multiply(left._vector.ToVector128(1), right._vector.ToVector128(1))), size);
+                    return new VectorDouble(Sse2.Multiply(left._vector.ToVector128(0), right._vector.ToVector128(0)),
+                        Sse2.Multiply(left._vector.ToVector128(1), right._vector.ToVector128(1)));
 
                 //Software fallback
                 case 1:
@@ -650,20 +651,18 @@ namespace Vectors
                 //Full size vector instructions
                 case 2 when Sse2.IsSupported:
                     return new VectorDouble(Sse2.Divide(left._vector.ToVector128(0), right._vector.ToVector128(0)));
-                case 3 when Avx.IsSupported:
-                case 4 when Avx.IsSupported:
+                case 3 when false&&Avx.IsSupported:
+                case 4 when false&&Avx.IsSupported:
                     return new VectorDouble(Avx.Divide(left._vector.ToVector256(0), right._vector.ToVector256(0)),
                         size);
 
                 //Partial size vector instructions
                 case 3 when Sse2.IsSupported:
-                    return new VectorDouble(
-                        Vector256.Create(Sse2.Divide(left._vector.ToVector128(0), right._vector.ToVector128(0)),
-                            Vector128.CreateScalarUnsafe(left._vector[2] / right._vector[2])), size);
+                    return new VectorDouble(Sse2.Divide(left._vector.ToVector128(0), right._vector.ToVector128(0)),
+                        left._vector[2] / right._vector[2]);
                 case 4 when Sse2.IsSupported:
-                    return new VectorDouble(
-                        Vector256.Create(Sse2.Divide(left._vector.ToVector128(0), right._vector.ToVector128(0)),
-                            Sse2.Divide(left._vector.ToVector128(1), right._vector.ToVector128(1))), size);
+                    return new VectorDouble(Sse2.Divide(left._vector.ToVector128(0), right._vector.ToVector128(0)),
+                        Sse2.Divide(left._vector.ToVector128(1), right._vector.ToVector128(1)));
 
                 //Software fallback
                 case 1:

@@ -15,18 +15,47 @@ namespace Vectors
         //if this could be worked around and performance was good ReadOnlyMemory<double>.Span exists.
         internal readonly double[] Doubles;
 
-        //TODO Split constants into derived struct to rely on typeof(instance) == typeof(DerivedStruct) instead which is a compile time constant 
+        //TODO Check if it is possible to make constant vectors different in a way that is detectable at compile time
+        //Check if them being static helps, I tried to go for compile time constants but that is not possible with structs
+        //Would it be possible to store them as constant pure data and then at runtime do a one time conversion to a VectorDouble?
         internal readonly bool MultiSize;
 
         internal unsafe RegisterDouble(Vector128<double> values)
         {
+            //TODO Check if Unsafe.WriteUnaligned would be faster
             Doubles = new Span<double>(&values, 2).ToArray();
             MultiSize = false;
         }
 
         internal unsafe RegisterDouble(Vector256<double> values, int count)
         {
+            //TODO Check if Unsafe.WriteUnaligned would be faster
             Doubles = new Span<double>(&values, count).ToArray();
+            MultiSize = false;
+        }
+
+        //Used for Sse2 fallback of hardcoded 192 bit double vectors
+        internal RegisterDouble(Vector128<double> block128, double value)
+        {
+            Doubles = new double[3];
+
+            Unsafe.CopyBlockUnaligned(ref Unsafe.As<double, byte>(ref Doubles[0]),
+                ref Unsafe.As<Vector128<double>, byte>(ref block128), 2 * sizeof(double));
+            Doubles[2] = value;
+
+            MultiSize = false;
+        }
+
+        //Used for Sse2 fallback of hardcoded 256 bit double vectors
+        internal RegisterDouble(Vector128<double> firstBlock128, Vector128<double> secondBlock128)
+        {
+            Doubles = new double[4];
+
+            Unsafe.CopyBlockUnaligned(ref Unsafe.As<double, byte>(ref Doubles[0]),
+                ref Unsafe.As<Vector128<double>, byte>(ref firstBlock128), 2 * sizeof(double));
+            Unsafe.CopyBlockUnaligned(ref Unsafe.As<double, byte>(ref Doubles[2]),
+                ref Unsafe.As<Vector128<double>, byte>(ref secondBlock128), 2 * sizeof(double));
+
             MultiSize = false;
         }
 
