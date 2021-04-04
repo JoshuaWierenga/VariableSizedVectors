@@ -1,7 +1,14 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Runtime.Intrinsics;
+
+#if DEBUG
+using System.Globalization;
+using System.Reflection;
+using System.Text;
+#endif
 
 namespace Vectors
 {
@@ -9,8 +16,10 @@ namespace Vectors
     //TODO Would it be possible to create a linked list style structure
     //this would allow returning to the old VectorX<double> constructor setup and not need any array like type
     //Performance for later items would probably be bad however
+    [DebuggerDisplay("{" + nameof(DebugToString) + "}")]
+    [DebuggerTypeProxy(typeof(RegisterDebugView))]
     [StructLayout(LayoutKind.Explicit)]
-    public unsafe struct Register
+    public readonly unsafe struct Register
     {
         //TODO Check if it is possible to make constant vectors different in a way that is detectable at compile time
         //Check if them being static helps, I tried to go for compile time constants but that is not possible with structs
@@ -26,29 +35,69 @@ namespace Vectors
         //ReadOnlySpan requires ref on Vector which breaks interfaces.
         //I tried ReadOnlyMemory but it does not have a void* constructor
         //if this could be worked around and performance was good ReadOnlyMemory<T>.Span exists.
-        //TODO Determine if these unioned array fields are useful and if they work at all
+        //TODO Determine if these unioned array fields are useful and if so make them internal
         [FieldOffset(5)]
         internal readonly byte* pUInt8Values;
         [FieldOffset(5)]
-        private readonly sbyte* pInt8Values;
+#if DEBUG
+        internal
+#endif
+        readonly sbyte* pInt8Values;
         [FieldOffset(5)]
-        private readonly ushort* pUInt16Values;
+#if DEBUG
+        internal
+#endif
+        readonly ushort* pUInt16Values;
         [FieldOffset(5)]
-        private readonly short* pInt16Values;
+#if DEBUG
+        internal
+#endif
+        readonly short* pInt16Values;
         [FieldOffset(5)]
-        private readonly uint* pUInt32Values;
+#if DEBUG
+        internal
+#endif
+        readonly uint* pUInt32Values;
         [FieldOffset(5)]
-        private readonly int* pInt32Values;
+#if DEBUG
+        internal
+#endif
+        readonly int* pInt32Values;
         [FieldOffset(5)]
-        private readonly ulong* pUInt64Values;
+#if DEBUG
+        internal
+#endif
+        readonly ulong* pUInt64Values;
         [FieldOffset(5)]
-        private readonly long* pInt64Values;
+#if DEBUG
+        internal
+#endif
+        readonly long* pInt64Values;
         [FieldOffset(5)]
-        private readonly float* pBinary32Values;
+#if DEBUG
+        internal
+#endif
+        readonly float* pBinary32Values;
         [FieldOffset(5)]
-        private readonly double* pBinary64Values;
+#if DEBUG
+        internal
+#endif
+        readonly double* pBinary64Values;
 
+#if DEBUG
+        [FieldOffset(13)]
+        internal readonly int ElementSize;
+        [FieldOffset(17)]
+        private readonly int ElementTypeLength;
+        [FieldOffset(21)]
+        private readonly byte* ElementType;
+#endif
+
+#if DEBUG
+        private Register(Type type, int typeSize, int count, bool constant = false)
+#else
         private Register(int typeSize, int count, bool constant = false)
+#endif
         {
             pUInt8Values = default;
             pInt8Values = default;
@@ -63,6 +112,7 @@ namespace Vectors
 
             switch (typeSize)
             {
+                //TODO Determine if Unsafe.As or fixed is quicker
                 case 8:
                     sbyte[] sbytes = new sbyte[count];
                     pInt8Values = (sbyte*)Unsafe.As<sbyte[], IntPtr>(ref sbytes).ToPointer();
@@ -85,6 +135,20 @@ namespace Vectors
 
             Constant = constant;
             Length = count;
+#if DEBUG
+            //Used in RegisterDebugView to make appropriately sized arrays for each type 
+            ElementSize = typeSize / 8;
+
+            //Used in DebugToString which needs to know the correct type
+            //Can't store Type, String or byte[] with FieldOffset so using byte*
+            byte[] typeName = Encoding.Default.GetBytes(type.FullName);
+            fixed (byte* pTypeName = typeName)
+            {
+                ElementType = pTypeName;
+            }
+
+            ElementTypeLength = typeName.Length;
+#endif
         }
 
 
@@ -95,43 +159,84 @@ namespace Vectors
         {
             if (typeof(T) == typeof(byte))
             {
-                return new Register(8, NumberIn256Bits<T>(), constant);
+                return new Register(
+#if DEBUG
+                typeof(T),
+#endif
+                8, NumberIn256Bits<T>(), constant);
+
             }
             else if (typeof(T) == typeof(sbyte))
             {
-                return new Register(8, NumberIn256Bits<T>(), constant);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    8, NumberIn256Bits<T>(), constant);
             }
             else if (typeof(T) == typeof(ushort))
             {
-                return new Register(16, NumberIn256Bits<T>(), constant);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    16, NumberIn256Bits<T>(), constant);
             }
             else if (typeof(T) == typeof(short))
             {
-                return new Register(16, NumberIn256Bits<T>(), constant);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    16, NumberIn256Bits<T>(), constant);
             }
             else if (typeof(T) == typeof(uint))
             {
-                return new Register(32, NumberIn256Bits<T>(), constant);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    32, NumberIn256Bits<T>(), constant);
             }
             else if (typeof(T) == typeof(int))
             {
-                return new Register(32, NumberIn256Bits<T>(), constant);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    32, NumberIn256Bits<T>(), constant);
             }
             else if (typeof(T) == typeof(ulong))
             {
-                return new Register(64, NumberIn256Bits<T>(), constant);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    64, NumberIn256Bits<T>(), constant);
             }
             else if (typeof(T) == typeof(long))
             {
-                return new Register(64, NumberIn256Bits<T>(), constant);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    64, NumberIn256Bits<T>(), constant);
             }
             else if (typeof(T) == typeof(float))
             {
-                return new Register(32, NumberIn256Bits<T>(), constant);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    32, NumberIn256Bits<T>(), constant);
             }
             else if (typeof(T) == typeof(double))
             {
-                return new Register(64, NumberIn256Bits<T>(), constant);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    64, NumberIn256Bits<T>(), constant);
             }
             else
             {
@@ -145,43 +250,83 @@ namespace Vectors
         {
             if (typeof(T) == typeof(byte))
             {
-                return new Register(8, count);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    8, count);
             }
             else if (typeof(T) == typeof(sbyte))
             {
-                return new Register(8, count);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    8, count);
             }
             else if (typeof(T) == typeof(ushort))
             {
-                return new Register(16, count);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    16, count);
             }
             else if (typeof(T) == typeof(short))
             {
-                return new Register(16, count);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    16, count);
             }
             else if (typeof(T) == typeof(uint))
             {
-                return new Register(32, count);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    32, count);
             }
             else if (typeof(T) == typeof(int))
             {
-                return new Register(32, count);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    32, count);
             }
             else if (typeof(T) == typeof(ulong))
             {
-                return new Register(64, count);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    64, count);
             }
             else if (typeof(T) == typeof(long))
             {
-                return new Register(64, count);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    64, count);
             }
             else if (typeof(T) == typeof(float))
             {
-                return new Register(32, count);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    32, count);
             }
             else if (typeof(T) == typeof(double))
             {
-                return new Register(64, count);
+                return new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    64, count);
             }
             else
             {
@@ -201,7 +346,11 @@ namespace Vectors
             //TODO Determine if the typeof compile optimisation works if branches are merged
             if (typeof(T) == typeof(byte))
             {
-                register = new Register(8, NumberIn256Bits<T>(), true);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    8, NumberIn256Bits<T>(), true);
                 for (int i = 0; i < 32; i++)
                 {
                     Unsafe.WriteUnaligned(ref register.pUInt8Values[i], value);
@@ -209,7 +358,11 @@ namespace Vectors
             }
             else if (typeof(T) == typeof(sbyte))
             {
-                register = new Register(8, NumberIn256Bits<T>(), true);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    8, NumberIn256Bits<T>(), true);
                 for (int i = 0; i < 32; i++)
                 {
                     //TODO Test if this works
@@ -218,7 +371,11 @@ namespace Vectors
             }
             else if (typeof(T) == typeof(ushort))
             {
-                register = new Register(16, NumberIn256Bits<T>(), true);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    16, NumberIn256Bits<T>(), true);
                 for (int i = 0; i < 16; i++)
                 {
                     //TODO Ensure this works
@@ -227,7 +384,11 @@ namespace Vectors
             }
             else if (typeof(T) == typeof(short))
             {
-                register = new Register(16, NumberIn256Bits<T>(), true);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    16, NumberIn256Bits<T>(), true);
                 for (int i = 0; i < 16; i++)
                 {
                     Unsafe.WriteUnaligned(ref register.pUInt8Values[i << 1], value);
@@ -235,7 +396,11 @@ namespace Vectors
             }
             else if (typeof(T) == typeof(uint))
             {
-                register = new Register(32, NumberIn256Bits<T>(), true);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    32, NumberIn256Bits<T>(), true);
                 for (int i = 0; i < 8; i++)
                 {
                     Unsafe.WriteUnaligned(ref register.pUInt8Values[i << 2], value);
@@ -243,7 +408,11 @@ namespace Vectors
             }
             else if (typeof(T) == typeof(int))
             {
-                register = new Register(32, NumberIn256Bits<T>(), true);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    32, NumberIn256Bits<T>(), true);
                 for (int i = 0; i < 8; i++)
                 {
                     Unsafe.WriteUnaligned(ref register.pUInt8Values[i << 2], value);
@@ -251,7 +420,11 @@ namespace Vectors
             }
             else if (typeof(T) == typeof(ulong))
             {
-                register = new Register(64, NumberIn256Bits<T>(), true);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    64, NumberIn256Bits<T>(), true);
                 for (int i = 0; i < 4; i++)
                 {
                     Unsafe.WriteUnaligned(ref register.pUInt8Values[i << 3], value);
@@ -259,7 +432,11 @@ namespace Vectors
             }
             else if (typeof(T) == typeof(long))
             {
-                register = new Register(64, NumberIn256Bits<T>(), true);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    64, NumberIn256Bits<T>(), true);
                 for (int i = 0; i < 4; i++)
                 {
                     Unsafe.WriteUnaligned(ref register.pUInt8Values[i << 3], value);
@@ -267,7 +444,11 @@ namespace Vectors
             }
             else if (typeof(T) == typeof(float))
             {
-                register = new Register(32, NumberIn256Bits<T>(), true);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    32, NumberIn256Bits<T>(), true);
                 for (int i = 0; i < 8; i++)
                 {
                     Unsafe.WriteUnaligned(ref register.pUInt8Values[i << 2], value);
@@ -275,7 +456,11 @@ namespace Vectors
             }
             else if (typeof(T) == typeof(double))
             {
-                register = new Register(64, NumberIn256Bits<T>(), true);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    64, NumberIn256Bits<T>(), true);
                 for (int i = 0; i < 4; i++)
                 {
                     Unsafe.WriteUnaligned(ref register.pUInt8Values[i << 3], value);
@@ -296,43 +481,83 @@ namespace Vectors
 
             if (typeof(T) == typeof(byte))
             {
-                register = new Register(8, 1);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    8, 1);
             }
             else if (typeof(T) == typeof(sbyte))
             {
-                register = new Register(8, 1);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    8, 1);
             }
             else if (typeof(T) == typeof(ushort))
             {
-                register = new Register(16, 1);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    16, 1);
             }
             else if (typeof(T) == typeof(short))
             {
-                register = new Register(16, 1);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    16, 1);
             }
             else if (typeof(T) == typeof(uint))
             {
-                register = new Register(32, 1);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    32, 1);
             }
             else if (typeof(T) == typeof(int))
             {
-                register = new Register(32, 1);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    32, 1);
             }
             else if (typeof(T) == typeof(ulong))
             {
-                register = new Register(64, 1);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    64, 1);
             }
             else if (typeof(T) == typeof(long))
             {
-                register = new Register(64, 1);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    64, 1);
             }
             else if (typeof(T) == typeof(float))
             {
-                register = new Register(32, 1);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    32, 1);
             }
             else if (typeof(T) == typeof(double))
             {
-                register = new Register(64, 1);
+                register = new Register(
+#if DEBUG
+                    typeof(T),
+#endif
+                    64, 1);
             }
             else
             {
@@ -340,6 +565,7 @@ namespace Vectors
             }
 
             Unsafe.WriteUnaligned(ref register.pUInt8Values[0], value);
+
             return register;
         }
 
@@ -788,5 +1014,41 @@ namespace Vectors
                 throw new NotSupportedException();
             }
         }
+
+
+        internal unsafe string DebugToString
+        {
+            get
+            {
+#if DEBUG
+                StringBuilder sb = new();
+                string separator = NumberFormatInfo.CurrentInfo.NumberGroupSeparator;
+
+                byte[] items = new byte[ElementTypeLength];
+                Marshal.Copy((IntPtr)ElementType, items, 0, ElementTypeLength);
+                Type storedType = Type.GetType(Encoding.Default.GetString(items));
+
+                MethodInfo methodInfo = typeof(Register).GetMethod("GetValue", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .MakeGenericMethod(storedType);
+
+                sb.Append('<');
+                object firstNum = methodInfo.Invoke(this, new object[] { 0 });
+                sb.Append(((IFormattable)firstNum).ToString("G",
+                    CultureInfo.CurrentCulture));
+
+                for (int i = 1; i < Length; i++)
+                {
+                    sb.Append(separator);
+                    sb.Append(' ');
+                    sb.Append(((IFormattable)methodInfo.Invoke(null, new object[] { i })).ToString("G", CultureInfo.CurrentCulture));
+                }
+
+                sb.Append('>');
+                return sb.ToString();
+#endif
+                return "";
+            }
+        }
+
     }
 }
