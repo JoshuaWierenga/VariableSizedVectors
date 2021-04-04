@@ -29,24 +29,6 @@ namespace Vectors
             MultiSize = false;
         }
 
-        internal unsafe Register(Vector128<T> values, int count)
-        {
-            //TODO Check if Unsafe.WriteUnaligned would be faster
-            Values = new Span<T>(&values, count).ToArray();
-            MultiSize = false;
-        }
-
-        //Needed since x86 vector extension operations cannot handle Vector256<T> only Vector256<SomeTypeHere>, at least in c#
-        //This function takes the result in terms of some hardcoded type U and casts it back to the general T to get around this
-        internal static Register<T> Create<U>(Vector256<U> values, int count) where U : struct
-        {
-            Register<T> register = new(count);
-            Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref register.Values[0]),
-                ref Unsafe.As<Vector256<U>, byte>(ref values), (uint) (count << BitShiftHelpers.SizeOf<T>()));
-
-            return register;
-        }
-
         //TODO Rewrite for whatever is needed now as 128 + Unsafe.SizeOf<T>() =/= 192 at all times, only for Double, Int64 and UInt64
         //Use Vector64<T>? If so we need another set of cases in Vector<T> to handle mmx
         //Used for Sse2 fallback of hardcoded 192 bit double vectors
@@ -76,49 +58,6 @@ namespace Vectors
             MultiSize = false;
         }
 
-        //Constructs a new vector with all values from blocks256(optional) and then all values from blocks128(optional) and then finally value(optional) goes on the end
-        //Note that despite the fact that all parameters are optional, at least one must be given
-        internal Register(int count, T? value = null, Vector128<T>[] blocks128 = null, Vector256<T>[] blocks256 = null)
-        {
-            if (blocks256 == null && blocks128 == null && value == null)
-            {
-                //TODO Revert, this is just temporary to prevent crashes
-                //throw new ArgumentNullException();
-                Values = new T[count];
-                MultiSize = false;
-                return;
-            }
-
-            int processed = 0;
-
-            Values = new T[count];
-
-            if (blocks256 != null)
-            {
-                processed = blocks256.Length << BitShiftAmount256Bit();
-
-                Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref Values[0]),
-                    ref Unsafe.As<Vector256<T>, byte>(ref blocks256[0]), (uint)(processed << 3));
-            }
-
-            if (blocks128 != null)
-            {
-                int count128 = blocks128.Length << BitShiftAmount128Bit();
-
-                Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref Values[processed]),
-                    ref Unsafe.As<Vector128<T>, byte>(ref blocks128[0]), (uint)(count128 << 3));
-
-                processed += count128;
-            }
-
-            if (value != null)
-            {
-                Values[processed] = value.Value;
-            }
-
-            MultiSize = false;
-        }
-
         internal Register(T value, bool multiSize = false)
         {
             if (multiSize)
@@ -144,15 +83,88 @@ namespace Vectors
             MultiSize = false;
         }
 
+
+        //Needed since x86 vector extension operations cannot handle VectorX<T> only VectorX<SomeTypeHere>, at least in c#
+        //This function takes the result in terms of some hardcoded type U and casts it back to the general T to get around this
+        internal static Register<T> Create<U>(Vector128<U> values, int count) where U : struct
+        {
+            Register<T> register = new(count);
+            Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref register.Values[0]),
+                ref Unsafe.As<Vector128<U>, byte>(ref values), 16);
+
+            return register;
+        }
+
+        //See comment on Vector128<U> Create function
+        internal static Register<T> Create<U>(Vector256<U> values, int count) where U : struct
+        {
+            Register<T> register = new(count);
+            Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref register.Values[0]),
+                ref Unsafe.As<Vector256<U>, byte>(ref values), 32);
+
+            return register;
+        }
+
+        //TODO remove BitShiftHelpers.AmountInXBit<T> and just ask caller for values?
+        //Add(...) does have the relevant values and might soon have the values as variables
+        //See comment on Vector128<U> Create function
+        //Constructs a new vector with all values from blocks256(optional) and then all values from blocks128(optional) and then finally value(optional) goes on the end
+        //Note that despite the fact that all parameters are optional, at least one must be given
+        internal static Register<T> Create<U>(int count, U? value = null, Vector128<U>[] blocks128 = null,
+            Vector256<U>[] blocks256 = null) where U : struct
+        {
+            if (blocks256 == null && blocks128 == null && value == null)
+            {
+                //TODO Revert, this is just temporary to prevent crashes
+                //this can be removed once operations can handle all vector sizes
+                //throw new ArgumentNullException();
+                return new Register<T>(count);
+            }
+
+            int processed = 0;
+
+            Register<T> register = new(count);
+
+            if (blocks256 != null)
+            {
+                processed = blocks256.Length << BitShiftAmountIn256Bit();
+
+                Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref register.Values[0]),
+                    ref Unsafe.As<Vector256<U>, byte>(ref blocks256[0]), (uint) (processed << 3));
+            }
+
+            if (blocks128 != null)
+            {
+                int count128 = blocks128.Length << BitShiftAmountIn128Bit();
+
+                Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref register.Values[processed]),
+                    ref Unsafe.As<Vector128<U>, byte>(ref blocks128[0]), (uint)(count128 << 3));
+
+                processed += count128;
+            }
+
+            if (value != null)
+            {
+                //TODO would just storing value.Value somewhere and then using
+                //register.Values[processed] = Unsafe.As<U, V>(ref storedValue) be better?
+                Unsafe.WriteUnaligned(ref Unsafe.As<T, byte>(ref register.Values[processed]), value!.Value);
+            }
+
+            return register;
+        }
+
+
         //TODO Decide if this should work as it does now and return adjacent vectors or should they overlap such that
         //the index has to increase by 2/4 to get an adjacent vector
         //TODO Decide if these need bounds checking for non constants. Provided at least some values in the subvector
         //exists but no all, Unsafe.As will still will return a valid vector but it will contain mostly junk and may
         //lead to crashes
+        //Needed since x86 vector extension operations cannot handle Vector128<T> only Vector128<SomeTypeHere>, at least in c#
+        //This function creates Vector128's in terms of a given type U to get around this
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal Vector128<T> ToVector128(int index) => MultiSize
-            ? Unsafe.As<T, Vector128<T>>(ref Values[0])
-            : Unsafe.As<T, Vector128<T>>(ref Values[index << 1]);
+        internal Vector128<U> ToVector128<U>(int index) where U : struct => MultiSize
+            ? Unsafe.As<T, Vector128<U>>(ref Values[0])
+            : Unsafe.As<T, Vector128<U>>(ref Values[index << 1]);
 
         //Needed since x86 vector extension operations cannot handle Vector256<T> only Vector256<SomeTypeHere>, at least in c#
         //This function creates Vector256's in terms of a given type U to get around this
@@ -167,13 +179,14 @@ namespace Vectors
             get => MultiSize ? Values[0] : Values[index];
         }
 
-        //Find number required to use while bitshifting to mimic multiplication for a specific type
-        //Used to compute the number of values in an array of Vector128<T>s
-        //Provided I understand how AggressiveInlining and typeof work, this should be reduced to a single
-        //result and inlined at compile time for every instance of this class
-        //This is the result of log_2(128/Unsafe.SizeOf<T> / 8)
+
+        //Provided I understand how AggressiveInlining and typeof work, this bitshift functions
+        //should be reduced to a single result and inlined at compile time for every call
+
+        //This is the result of log_2(128/Unsafe.SizeOf<T> / 8) and is designed to be used
+        //as "a << AmountIn128Bit<T>()" whenever "a * Vector128<T>.Count() might be used
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int BitShiftAmount128Bit()
+        internal static int BitShiftAmountIn128Bit()
         {
             if (typeof(T) == typeof(byte))
             {
@@ -221,10 +234,10 @@ namespace Vectors
             }
         }
 
-        //See above comment. Used to compute the number of values in an array of Vector256<T>s
-        //This is the result of log_2(256/(Unsafe.SizeOf<T>*8))
+        //This is the result of log_2(256/Unsafe.SizeOf<T> / 8) and is designed to be used
+        //as "a << AmountIn256Bit<T>()" whenever "a * Vector256<T>.Count() might be used
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int BitShiftAmount256Bit()
+        internal static int BitShiftAmountIn256Bit()
         {
             if (typeof(T) == typeof(byte))
             {
