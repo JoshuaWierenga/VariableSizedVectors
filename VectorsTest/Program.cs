@@ -95,6 +95,23 @@ namespace VectorsTest
             Console.WriteLine($"{firstDouble} == {secondDouble} = {firstDouble == secondDouble}");
             Console.WriteLine($"{firstDouble} == {firstDouble} = {firstDouble == firstDouble}");
             Console.WriteLine($"{firstDouble} != {secondDouble} = {firstDouble != secondDouble}");
+
+            Console.WriteLine();
+
+            Console.WriteLine("Byte 20 value vector");
+            firstByte = new Vector<byte>(new byte[] { 3, 6, 9, 12, 15, 18, 21, 24, 27, 30, 33, 36, 39, 42, 45, 48, 51, 54, 57, 60 });
+            secondByte = new Vector<byte>(new byte[] { 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40 });
+
+            Console.WriteLine($"{firstByte} + {secondByte} = {firstByte + secondByte}");
+            Console.WriteLine($"{firstByte} - {secondByte} = {firstByte - secondByte}");
+            Console.WriteLine($"{firstByte} * {secondByte} = {firstByte * secondByte}");
+            Console.WriteLine($"{firstByte} * {2} = {firstByte * 2}");
+            Console.WriteLine($"{6} * {secondByte} = {6 * secondByte}");
+            Console.WriteLine($"{firstByte} / {secondByte} = {firstByte / secondByte}");
+            //Console.WriteLine($"-{firstByte} = {-firstByte}");
+            Console.WriteLine($"{firstByte} == {secondByte} = {firstByte == secondByte}");
+            Console.WriteLine($"{firstByte} == {firstByte} = {firstByte == firstByte}");
+            Console.WriteLine($"{firstByte} != {secondByte} = {firstByte != secondByte}");
         }
     }
 }

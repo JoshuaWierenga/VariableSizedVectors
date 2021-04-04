@@ -77,25 +77,45 @@ namespace Vectors
         public Vector(Span<T> values) : this((ReadOnlySpan<T>)values) { }
 
 
+        //Used for x86 Sse(2) optimised operations on 128 bit vectors
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static Vector<T> Create<U>(Vector128<U> values, int count) where U : struct =>
             new(Register<T>.Create(values, count));
 
+        //Used for x86 Avx(2) optimised operations on 256 bit vectors
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static Vector<T> Create<U>(Vector256<U> values, int count) where U : struct =>
             new(Register<T>.Create(values, count));
 
+        //Used for operations on single value vectors
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static Vector<T> Create<U>(U value) where U : struct => new(Unsafe.As<U, T>(ref value));
 
+        //Used on systems without x86 vector extensions for all operations and vector sizes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static Vector<T> Create<U>(U[] values) where U : struct => new(Unsafe.As<U[], T[]>(ref values), 0);
 
+        //Used for x86 Sse(2) semi optimised operations on 192 bit vectors containing 64 bit types
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Vector<T> Create<U>(int count, U value, Vector128<U> block128) where U : struct =>
+            new(Register<T>.Create(count, value, block128));
+
+        //Used for x86 Sse(2) semi optimised operations on 136 to 248 bit vectors
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Vector<T> Create<U>(int count, U[] values, Vector128<U> block128) where U : struct =>
+            new(Register<T>.Create(count, values, block128));
+
+        //Used for x86 Sse(2) and Avx(2) optimised operations on vectors larger than 256 bits for all 64 bit types
+        //as well as smaller types when the vector is composed of some number of 256 bit blocks, some number of 
+        //128 bit blocks and then zero or one extra value
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static Vector<T> Create<U>(int count, U? value = null, Vector128<U>[] blocks128 = null,
             Vector256<U>[] blocks256 = null) where U : struct =>
             new(Register<T>.Create(count, value, blocks128, blocks256));
 
+        //Used for all x86 Sse(2) and Avx(2) optimised operations on vectors larger than 256 bits for all types
+        //smaller than 64 bit where the vector is composed of some number of 256 bit blocks, some number of 128
+        //bit blocks and then 2 or more extra values
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static Vector<T> Create<U>(int count, U[] values = null, Vector128<U>[] blocks128 = null,
             Vector256<U>[] blocks256 = null) where U : struct =>
@@ -824,10 +844,9 @@ namespace Vectors
         //TODO Find way to merge branches since other than types, they all contain the same code
         //TODO Ensure constants are set correctly, is it worth making the constant for each type a variable in each if case?
         //There are functions in Register<T> to calculate them but that feels unnecessary since those are for generic cases
-        //TODO Support 16 though 120 bit operations(i.e. 2-15 (s)bytes, 2-7 (u)shorts and 2-3 (u)ints/floats)
-        //TODO Support 136 though 248 bit operations(i.e. 17-31 (s)bytes, 9-15 (u)shorts, 5-7 (u)ints/floats and 3 (u)longs/doubles)
-        //currently in the these two cases all numbers are ignored
-        //TODO Optimise arbitrary length remainder(<128bit) code since the maximum size is fixed and so can be unrolled, more so for 32bit and perhaps 16bit numbers
+        //TODO Is it worth unrolling 16 though 120 bit operations(i.e. 2-15 (s)bytes, 2-7 (u)shorts and 2-3 (u)ints/floats)?
+        //TODO Optimise arbitrary length remainder(<128bit) and 136 to 248bit code since the maximum size is fixed and so can be unrolled, 
+        //more so for 32 bit and perhaps 16 bit numbers
         //This method performs addition on the vectors left and right.
         //If x86 vector extensions are supported then this method first handles the conversion of Vector<T>s to some
         //intermediate Vector128<U>/Vector256<U> where U is the same as T but has to be named differently to get around
@@ -848,6 +867,18 @@ namespace Vectors
                     case 32 when IntrinsicSupport.IsAvx2Supported:
                         return Create(
                             Avx2.Add(left._vector.ToVector256<byte>(0), right._vector.ToVector256<byte>(0)), count);
+                    case < 32 and > 16 when IntrinsicSupport.IsSse2Supported:
+                        Vector128<byte> lower128 = Sse2.Add(left._vector.ToVector128<byte>(0),
+                            right._vector.ToVector128<byte>(0));
+
+                        byte[] upperValues = new byte[count - 16];
+
+                        for (int i = 0, j = 16; i < upperValues.Length; i++, j++)
+                        {
+                            upperValues[i] = (byte)((byte)(object)left._vector[j] + (byte)(object)right._vector[j]);
+                        }
+
+                        return Create(count, upperValues, lower128);
                     case 16 when IntrinsicSupport.IsSse2Supported:
                         return Create(
                             Sse2.Add(left._vector.ToVector128<byte>(0), right._vector.ToVector128<byte>(0)), count);
@@ -862,19 +893,18 @@ namespace Vectors
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
                         return Create((byte)(object)left._vector[0] + (byte)(object)right._vector[0]);
-                    //Temporary fallback, there are missing x86 cases that could be added for extra performance
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
                         if (!IntrinsicSupport.IsSse2Supported)
                         {
-                            byte[] values64 = new byte[count];
+                            byte[] values = new byte[count];
 
-                            for (int i = 0; i < values64.Length; i++)
+                            for (int i = 0; i < values.Length; i++)
                             {
-                                values64[i] = (byte)((byte)(object)left._vector[i] + (byte)(object)right._vector[i]);
+                                values[i] = (byte)((byte)(object)left._vector[i] + (byte)(object)right._vector[i]);
                             }
 
-                            return Create(values64);
+                            return Create(values);
                         }
 
                         Vector128<byte>[] blocks128 = null;
@@ -942,6 +972,18 @@ namespace Vectors
                     case 32 when IntrinsicSupport.IsAvx2Supported:
                         return Create(
                             Avx2.Add(left._vector.ToVector256<sbyte>(0), right._vector.ToVector256<sbyte>(0)), count);
+                    case < 32 and > 16 when IntrinsicSupport.IsSse2Supported:
+                        Vector128<sbyte> lower128 = Sse2.Add(left._vector.ToVector128<sbyte>(0),
+                            right._vector.ToVector128<sbyte>(0));
+
+                        sbyte[] upperValues = new sbyte[count - 16];
+
+                        for (int i = 0, j = 16; i < upperValues.Length; i++, j++)
+                        {
+                            upperValues[i] = (sbyte)((sbyte)(object)left._vector[j] + (sbyte)(object)right._vector[j]);
+                        }
+
+                        return Create(count, upperValues, lower128);
                     case 16 when IntrinsicSupport.IsSse2Supported:
                         return Create(
                             Sse2.Add(left._vector.ToVector128<sbyte>(0), right._vector.ToVector128<sbyte>(0)), count);
@@ -956,19 +998,18 @@ namespace Vectors
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
                         return Create((sbyte)(object)left._vector[0] + (sbyte)(object)right._vector[0]);
-                    //Temporary fallback, there are missing x86 cases that could be added for extra performance
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
                         if (!IntrinsicSupport.IsSse2Supported)
                         {
-                            sbyte[] values64 = new sbyte[count];
+                            sbyte[] values = new sbyte[count];
 
-                            for (int i = 0; i < values64.Length; i++)
+                            for (int i = 0; i < values.Length; i++)
                             {
-                                values64[i] = (sbyte)((sbyte)(object)left._vector[i] + (sbyte)(object)right._vector[i]);
+                                values[i] = (sbyte)((sbyte)(object)left._vector[i] + (sbyte)(object)right._vector[i]);
                             }
 
-                            return Create(values64);
+                            return Create(values);
                         }
 
                         Vector128<sbyte>[] blocks128 = null;
@@ -1036,6 +1077,18 @@ namespace Vectors
                     case 16 when IntrinsicSupport.IsAvx2Supported:
                         return Create(
                             Avx2.Add(left._vector.ToVector256<ushort>(0), right._vector.ToVector256<ushort>(0)), count);
+                    case < 16 and > 8 when IntrinsicSupport.IsSse2Supported:
+                        Vector128<ushort> lower128 = Sse2.Add(left._vector.ToVector128<ushort>(0),
+                            right._vector.ToVector128<ushort>(0));
+
+                        ushort[] upperValues = new ushort[count - 8];
+
+                        for (int i = 0, j = 8; i < upperValues.Length; i++, j++)
+                        {
+                            upperValues[i] = (ushort)((ushort)(object)left._vector[j] + (ushort)(object)right._vector[j]);
+                        }
+
+                        return Create(count, upperValues, lower128);
                     case 8 when IntrinsicSupport.IsSse2Supported:
                         return Create(
                             Sse2.Add(left._vector.ToVector128<ushort>(0), right._vector.ToVector128<ushort>(0)), count);
@@ -1050,19 +1103,18 @@ namespace Vectors
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
                         return Create((ushort)(object)left._vector[0] + (ushort)(object)right._vector[0]);
-                    //Temporary fallback, there are missing x86 cases that could be added for extra performance
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
                         if (!IntrinsicSupport.IsSse2Supported)
                         {
-                            ushort[] values64 = new ushort[count];
+                            ushort[] values = new ushort[count];
 
-                            for (int i = 0; i < values64.Length; i++)
+                            for (int i = 0; i < values.Length; i++)
                             {
-                                values64[i] = (ushort)((ushort)(object)left._vector[i] + (ushort)(object)right._vector[i]);
+                                values[i] = (ushort)((ushort)(object)left._vector[i] + (ushort)(object)right._vector[i]);
                             }
 
-                            return Create(values64);
+                            return Create(values);
                         }
 
                         Vector128<ushort>[] blocks128 = null;
@@ -1130,6 +1182,18 @@ namespace Vectors
                     case 16 when IntrinsicSupport.IsAvx2Supported:
                         return Create(
                             Avx2.Add(left._vector.ToVector256<short>(0), right._vector.ToVector256<short>(0)), count);
+                    case < 16 and > 8 when IntrinsicSupport.IsSse2Supported:
+                        Vector128<short> lower128 = Sse2.Add(left._vector.ToVector128<short>(0),
+                            right._vector.ToVector128<short>(0));
+
+                        short[] upperValues = new short[count - 8];
+
+                        for (int i = 0, j = 8; i < upperValues.Length; i++, j++)
+                        {
+                            upperValues[i] = (short)((short)(object)left._vector[j] + (short)(object)right._vector[j]);
+                        }
+
+                        return Create(count, upperValues, lower128);
                     case 8 when IntrinsicSupport.IsSse2Supported:
                         return Create(
                             Sse2.Add(left._vector.ToVector128<short>(0), right._vector.ToVector128<short>(0)), count);
@@ -1144,19 +1208,18 @@ namespace Vectors
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
                         return Create((short)(object)left._vector[0] + (short)(object)right._vector[0]);
-                    //Temporary fallback, there are missing x86 cases that could be added for extra performance
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
                         if (!IntrinsicSupport.IsSse2Supported)
                         {
-                            short[] values64 = new short[count];
+                            short[] values = new short[count];
 
-                            for (int i = 0; i < values64.Length; i++)
+                            for (int i = 0; i < values.Length; i++)
                             {
-                                values64[i] = (short)((short)(object)left._vector[i] + (short)(object)right._vector[i]);
+                                values[i] = (short)((short)(object)left._vector[i] + (short)(object)right._vector[i]);
                             }
 
-                            return Create(values64);
+                            return Create(values);
                         }
 
                         Vector128<short>[] blocks128 = null;
@@ -1224,6 +1287,18 @@ namespace Vectors
                     case 8 when IntrinsicSupport.IsAvx2Supported:
                         return Create(
                             Avx2.Add(left._vector.ToVector256<uint>(0), right._vector.ToVector256<uint>(0)), count);
+                    case < 8 and > 4 when IntrinsicSupport.IsSse2Supported:
+                        Vector128<uint> lower128 = Sse2.Add(left._vector.ToVector128<uint>(0),
+                            right._vector.ToVector128<uint>(0));
+
+                        uint[] upperValues = new uint[count - 4];
+
+                        for (int i = 0, j = 4; i < upperValues.Length; i++, j++)
+                        {
+                            upperValues[i] = (uint)(object)left._vector[j] + (uint)(object)right._vector[j];
+                        }
+
+                        return Create(count, upperValues, lower128);
                     case 4 when IntrinsicSupport.IsSse2Supported:
                         return Create(
                             Sse2.Add(left._vector.ToVector128<uint>(0), right._vector.ToVector128<uint>(0)), count);
@@ -1238,19 +1313,18 @@ namespace Vectors
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
                         return Create((uint)(object)left._vector[0] + (uint)(object)right._vector[0]);
-                    //Temporary fallback, there are missing x86 cases that could be added for extra performance
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
                         if (!IntrinsicSupport.IsSse2Supported)
                         {
-                            uint[] values64 = new uint[count];
+                            uint[] values = new uint[count];
 
-                            for (int i = 0; i < values64.Length; i++)
+                            for (int i = 0; i < values.Length; i++)
                             {
-                                values64[i] = (uint)(object)left._vector[i] + (uint)(object)right._vector[i];
+                                values[i] = (uint)(object)left._vector[i] + (uint)(object)right._vector[i];
                             }
 
-                            return Create(values64);
+                            return Create(values);
                         }
 
                         Vector128<uint>[] blocks128 = null;
@@ -1318,6 +1392,18 @@ namespace Vectors
                     case 8 when IntrinsicSupport.IsAvx2Supported:
                         return Create(
                             Avx2.Add(left._vector.ToVector256<int>(0), right._vector.ToVector256<int>(0)), count);
+                    case < 8 and > 4 when IntrinsicSupport.IsSse2Supported:
+                        Vector128<int> lower128 = Sse2.Add(left._vector.ToVector128<int>(0),
+                            right._vector.ToVector128<int>(0));
+
+                        int[] upperValues = new int[count - 4];
+
+                        for (int i = 0, j = 4; i < upperValues.Length; i++, j++)
+                        {
+                            upperValues[i] = (int)(object)left._vector[j] + (int)(object)right._vector[j];
+                        }
+
+                        return Create(count, upperValues, lower128);
                     case 4 when IntrinsicSupport.IsSse2Supported:
                         return Create(
                             Sse2.Add(left._vector.ToVector128<int>(0), right._vector.ToVector128<int>(0)), count);
@@ -1332,19 +1418,18 @@ namespace Vectors
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
                         return Create((int)(object)left._vector[0] + (int)(object)right._vector[0]);
-                    //Temporary fallback, there are missing x86 cases that could be added for extra performance
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
                         if (!IntrinsicSupport.IsSse2Supported)
                         {
-                            int[] values64 = new int[count];
+                            int[] values = new int[count];
 
-                            for (int i = 0; i < values64.Length; i++)
+                            for (int i = 0; i < values.Length; i++)
                             {
-                                values64[i] = (int)(object)left._vector[i] + (int)(object)right._vector[i];
+                                values[i] = (int)(object)left._vector[i] + (int)(object)right._vector[i];
                             }
 
-                            return Create(values64);
+                            return Create(values);
                         }
 
                         Vector128<int>[] blocks128 = null;
@@ -1412,6 +1497,13 @@ namespace Vectors
                     case 4 when IntrinsicSupport.IsAvx2Supported:
                         return Create(
                             Avx2.Add(left._vector.ToVector256<ulong>(0), right._vector.ToVector256<ulong>(0)), count);
+                    case 3 when IntrinsicSupport.IsSse2Supported:
+                        Vector128<ulong> lower128 = Sse2.Add(left._vector.ToVector128<ulong>(0),
+                            right._vector.ToVector128<ulong>(0));
+
+                        ulong upperValue = (ulong)(object)left._vector[3] + (ulong)(object)right._vector[3];
+
+                        return Create(count, upperValue, lower128);
                     case 2 when IntrinsicSupport.IsSse2Supported:
                         return Create(
                             Sse2.Add(left._vector.ToVector128<ulong>(0), right._vector.ToVector128<ulong>(0)), count);
@@ -1422,20 +1514,18 @@ namespace Vectors
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
                         return Create((ulong)(object)left._vector[0] + (ulong)(object)right._vector[0]);
-                    //TODO Remove comment and those like it when appropriate
-                    //Temporary fallback, there are missing x86 cases that could be added for extra performance
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
                         if (!IntrinsicSupport.IsSse2Supported)
                         {
-                            ulong[] values64 = new ulong[count];
+                            ulong[] values = new ulong[count];
 
-                            for (int i = 0; i < values64.Length; i++)
+                            for (int i = 0; i < values.Length; i++)
                             {
-                                values64[i] = (ulong)(object)left._vector[i] + (ulong)(object)right._vector[i];
+                                values[i] = (ulong)(object)left._vector[i] + (ulong)(object)right._vector[i];
                             }
 
-                            return Create(values64);
+                            return Create(values);
                         }
 
                         Vector128<ulong>[] blocks128 = null;
@@ -1491,6 +1581,13 @@ namespace Vectors
                     case 4 when IntrinsicSupport.IsAvx2Supported:
                         return Create(
                             Avx2.Add(left._vector.ToVector256<long>(0), right._vector.ToVector256<long>(0)), count);
+                    case 3 when IntrinsicSupport.IsSse2Supported:
+                        Vector128<long> lower128 = Sse2.Add(left._vector.ToVector128<long>(0),
+                            right._vector.ToVector128<long>(0));
+
+                        long upperValue = (long)(object)left._vector[3] + (long)(object)right._vector[3];
+
+                        return Create(count, upperValue, lower128);
                     case 2 when IntrinsicSupport.IsSse2Supported:
                         return Create(
                             Sse2.Add(left._vector.ToVector128<long>(0), right._vector.ToVector128<long>(0)), count);
@@ -1501,19 +1598,18 @@ namespace Vectors
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
                         return Create((long)(object)left._vector[0] + (long)(object)right._vector[0]);
-                    //Temporary fallback, there are missing x86 cases that could be added for extra performance
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
                         if (!IntrinsicSupport.IsSse2Supported)
                         {
-                            long[] values64 = new long[count];
+                            long[] values = new long[count];
 
-                            for (int i = 0; i < values64.Length; i++)
+                            for (int i = 0; i < values.Length; i++)
                             {
-                                values64[i] = (long)(object)left._vector[i] + (long)(object)right._vector[i];
+                                values[i] = (long)(object)left._vector[i] + (long)(object)right._vector[i];
                             }
 
-                            return Create(values64);
+                            return Create(values);
                         }
 
                         Vector128<long>[] blocks128 = null;
@@ -1569,6 +1665,18 @@ namespace Vectors
                     case 8 when IntrinsicSupport.IsAvxSupported:
                         return Create(
                             Avx.Add(left._vector.ToVector256<float>(0), right._vector.ToVector256<float>(0)), count);
+                    case < 8 and > 4 when IntrinsicSupport.IsSseSupported:
+                        Vector128<float> lower128 = Sse.Add(left._vector.ToVector128<float>(0),
+                            right._vector.ToVector128<float>(0));
+
+                        float[] upperValues = new float[count - 4];
+
+                        for (int i = 0, j = 4; i < upperValues.Length; i++, j++)
+                        {
+                            upperValues[i] = (float)(object)left._vector[j] + (float)(object)right._vector[j];
+                        }
+
+                        return Create(count, upperValues, lower128);
                     case 4 when IntrinsicSupport.IsSseSupported:
                         return Create(
                             Sse.Add(left._vector.ToVector128<float>(0), right._vector.ToVector128<float>(0)), count);
@@ -1583,19 +1691,18 @@ namespace Vectors
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
                         return Create((float)(object)left._vector[0] + (float)(object)right._vector[0]);
-                    //Temporary fallback, there are missing x86 cases that could be added for extra performance
                     default:
                         //Assumption is made that no Sse support means no Avx support
                         if (!IntrinsicSupport.IsSseSupported)
                         {
-                            float[] values64 = new float[count];
+                            float[] values = new float[count];
 
-                            for (int i = 0; i < values64.Length; i++)
+                            for (int i = 0; i < values.Length; i++)
                             {
-                                values64[i] = (float)(object)left._vector[i] + (float)(object)right._vector[i];
+                                values[i] = (float)(object)left._vector[i] + (float)(object)right._vector[i];
                             }
 
-                            return Create(values64);
+                            return Create(values);
                         }
 
                         Vector128<float>[] blocks128 = null;
@@ -1663,6 +1770,13 @@ namespace Vectors
                     case 4 when IntrinsicSupport.IsAvxSupported:
                         return Create(
                             Avx.Add(left._vector.ToVector256<double>(0), right._vector.ToVector256<double>(0)), count);
+                    case 3 when IntrinsicSupport.IsSse2Supported:
+                        Vector128<double> lower128 = Sse2.Add(left._vector.ToVector128<double>(0),
+                            right._vector.ToVector128<double>(0));
+
+                        double upperValue = (double)(object)left._vector[3] + (double)(object)right._vector[3];
+
+                        return Create(count, upperValue, lower128);
                     case 2 when IntrinsicSupport.IsSse2Supported:
                         return Create(
                             Sse2.Add(left._vector.ToVector128<double>(0), right._vector.ToVector128<double>(0)), count);
@@ -1673,19 +1787,18 @@ namespace Vectors
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
                         return Create((float)(object)left._vector[0] + (float)(object)right._vector[0]);
-                    //Temporary fallback, there are missing x86 cases that could be added for extra performance
                     default:
                         //Assumption is made that no Sse2 support means no Avx support
                         if (!IntrinsicSupport.IsSse2Supported)
                         {
-                            double[] values64 = new double[count];
+                            double[] values = new double[count];
 
-                            for (int i = 0; i < values64.Length; i++)
+                            for (int i = 0; i < values.Length; i++)
                             {
-                                values64[i] = (double)(object)left._vector[i] + (double)(object)right._vector[i];
+                                values[i] = (double)(object)left._vector[i] + (double)(object)right._vector[i];
                             }
 
-                            return Create(values64);
+                            return Create(values);
                         }
 
                         Vector128<double>[] blocks128 = null;

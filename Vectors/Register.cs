@@ -105,7 +105,39 @@ namespace Vectors
             return register;
         }
 
-        //TODO remove BitShiftHelpers.AmountInXBit<T> and just ask caller for values?
+        //TODO remove NumberIn128Bits() and just ask caller for values?
+        //Add(...) does have the relevant values and might soon have the values as variables
+        //See comment on Vector128<U> Create function
+        //Constructs a new vector with all values from block128 and then value goes on the end
+        internal static Register<T> Create<U>(int count, U value, Vector128<U> block128)
+            where U : struct
+        {
+            Register<T> register = new(count);
+
+            Unsafe.WriteUnaligned(ref Unsafe.As<T, byte>(ref register.Values[0]), block128);
+            Unsafe.WriteUnaligned(ref Unsafe.As<T, byte>(ref register.Values[NumberIn128Bits()]),
+                Unsafe.As<U, byte>(ref value));
+
+            return register;
+        }
+
+        //TODO remove NumberIn128Bits() and just ask caller for values?
+        //Add(...) does have the relevant values and might soon have the values as variables
+        //See comment on Vector128<U> Create function
+        //Constructs a new vector with all values from blocks128 and then all values from values
+        internal static Register<T> Create<U>(int count, U[] values, Vector128<U> block128)
+            where U : struct
+        {
+            Register<T> register = new(count);
+
+            Unsafe.WriteUnaligned(ref Unsafe.As<T, byte>(ref register.Values[0]), block128);
+            Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref register.Values[NumberIn128Bits()]),
+                ref Unsafe.As<U, byte>(ref values[0]), 16);
+
+            return register;
+        }
+
+        //TODO remove BitShiftHelpers.AmountInXBit<T>() and just ask caller for values?
         //Add(...) does have the relevant values and might soon have the values as variables
         //See comment on Vector128<U> Create function
         //Constructs a new vector with all values from blocks256(optional) and then all values from blocks128(optional) and then finally value(optional) goes on the end
@@ -233,7 +265,7 @@ namespace Vectors
         //This is the result of log_2(128/Unsafe.SizeOf<T> / 8) and is designed to be used
         //as "a << AmountIn128Bit<T>()" whenever "a * Vector128<T>.Count() might be used
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static int BitShiftAmountIn128Bit()
+        private static int BitShiftAmountIn128Bit()
         {
             if (typeof(T) == typeof(byte))
             {
@@ -284,7 +316,7 @@ namespace Vectors
         //This is the result of log_2(256/Unsafe.SizeOf<T> / 8) and is designed to be used
         //as "a << AmountIn256Bit<T>()" whenever "a * Vector256<T>.Count() might be used
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static int BitShiftAmountIn256Bit()
+        private static int BitShiftAmountIn256Bit()
         {
             if (typeof(T) == typeof(byte))
             {
@@ -332,9 +364,8 @@ namespace Vectors
             }
         }
 
-        //TODO Use or Remove
         //This is the result of 128/(Unsafe.SizeOf<T>*8)
-        /*[MethodImpl(MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int NumberIn128Bits()
         {
             if (typeof(T) == typeof(byte))
@@ -383,8 +414,9 @@ namespace Vectors
             }
         }
 
+        //TODO Use or Remove
         //This is the result of 256/(Unsafe.SizeOf<T>*8)
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        /*[MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static int NumberIn256Bits()
         {
             if (typeof(T) == typeof(byte))
