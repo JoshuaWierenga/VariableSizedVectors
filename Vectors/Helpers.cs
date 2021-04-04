@@ -4,6 +4,8 @@ using System.Runtime.Intrinsics.X86;
 
 namespace Vectors
 {
+    //Provided I understand how AggressiveInlining and typeof work, these bitshift functions should
+    //be reduced to a single result and inlined at compile time for every call for a given type
     internal static class BitShiftHelpers
     {
         //This is the result of log_2(Unsafe.SizeOf<T>) and is designed to be used
