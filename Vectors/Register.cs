@@ -130,7 +130,7 @@ namespace Vectors
                 processed = blocks256.Length << BitShiftAmountIn256Bit();
 
                 Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref register.Values[0]),
-                    ref Unsafe.As<Vector256<U>, byte>(ref blocks256[0]), (uint) (processed << 3));
+                    ref Unsafe.As<Vector256<U>, byte>(ref blocks256[0]), (uint)(processed << 3));
             }
 
             if (blocks128 != null)
@@ -148,6 +148,53 @@ namespace Vectors
                 //TODO would just storing value.Value somewhere and then using
                 //register.Values[processed] = Unsafe.As<U, V>(ref storedValue) be better?
                 Unsafe.WriteUnaligned(ref Unsafe.As<T, byte>(ref register.Values[processed]), value!.Value);
+            }
+
+            return register;
+        }
+
+        //TODO remove BitShiftAmountInXBit<T>() and BitShiftHelpers.SizeOf<T>() and just ask caller for values?
+        //Add(...) does have the relevant values and might soon have the values as variables
+        //See comment on Vector128<U> Create function
+        //Constructs a new vector with all values from blocks256(optional) and then all values from blocks128(optional) and then finally value(optional) goes on the end
+        //Note that despite the fact that all parameters are optional, at least one must be given
+        internal static Register<T> Create<U>(int count, U[] values = null, Vector128<U>[] blocks128 = null,
+            Vector256<U>[] blocks256 = null) where U : struct
+        {
+            if (blocks256 == null && blocks128 == null && values == null)
+            {
+                //TODO Revert, this is just temporary to prevent crashes
+                //this can be removed once operations can handle all vector sizes
+                //throw new ArgumentNullException();
+                return new Register<T>(count);
+            }
+
+            int processed = 0;
+
+            Register<T> register = new(count);
+
+            if (blocks256 != null)
+            {
+                processed = blocks256.Length << BitShiftAmountIn256Bit();
+
+                Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref register.Values[0]),
+                    ref Unsafe.As<Vector256<U>, byte>(ref blocks256[0]), (uint)(processed << 3));
+            }
+
+            if (blocks128 != null)
+            {
+                int count128 = blocks128.Length << BitShiftAmountIn128Bit();
+
+                Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref register.Values[processed]),
+                    ref Unsafe.As<Vector128<U>, byte>(ref blocks128[0]), (uint)(count128 << 3));
+
+                processed += count128;
+            }
+
+            if (values != null)
+            {
+                Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref register.Values[processed]),
+                    ref Unsafe.As<U, byte>(ref values[0]), (uint)(values.Length << BitShiftHelpers.SizeOf<T>()));
             }
 
             return register;

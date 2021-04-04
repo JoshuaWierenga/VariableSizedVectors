@@ -85,25 +85,33 @@ namespace Vectors
         private static Vector<T> Create<U>(Vector256<U> values, int count) where U : struct =>
             new(Register<T>.Create(values, count));
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static Vector<T> Create<U>(U value) where U : struct => new(Unsafe.As<U, T>(ref value));
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Vector<T> Create<U>(U[] values) where U : struct => new(Unsafe.As<U[], T[]>(ref values), 0);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static Vector<T> Create<U>(int count, U? value = null, Vector128<U>[] blocks128 = null,
             Vector256<U>[] blocks256 = null) where U : struct =>
             new(Register<T>.Create(count, value, blocks128, blocks256));
 
-        private static Vector<T> Create<U>(U[] values) where U : struct => new(Unsafe.As<U[], T[]>(ref values), 0);
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Vector<T> Create<U>(int count, U[] values = null, Vector128<U>[] blocks128 = null,
+            Vector256<U>[] blocks256 = null) where U : struct =>
+            new(Register<T>.Create(count, values, blocks128, blocks256));
+
 
         public readonly void CopyTo(Span<byte> destination)
         {
-            if ((uint)destination.Length < (uint)(_vector.Values.Length << BitShiftSizeOf()))
+            if ((uint)destination.Length < (uint)(_vector.Values.Length << BitShiftHelpers.SizeOf<T>()))
             {
                 throw new ArgumentException();
             }
 
             Unsafe.CopyBlockUnaligned(ref MemoryMarshal.GetReference(destination),
                 ref Unsafe.As<T, byte>(ref _vector.Values[0]),
-                (uint)(_vector.Values.Length << BitShiftSizeOf()));
+                (uint)(_vector.Values.Length << BitShiftHelpers.SizeOf<T>()));
         }
 
         public readonly void CopyTo(Span<T> destination)
@@ -115,7 +123,7 @@ namespace Vectors
 
             Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(destination)),
                 ref Unsafe.As<T, byte>(ref _vector.Values[0]),
-                (uint)(_vector.Values.Length << BitShiftSizeOf()));
+                (uint)(_vector.Values.Length << BitShiftHelpers.SizeOf<T>()));
         }
 
         public readonly void CopyTo(T[] destination) => CopyTo(destination, 0);
@@ -134,7 +142,7 @@ namespace Vectors
 
             Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref destination[startIndex]),
                 ref Unsafe.As<T, byte>(ref _vector.Values[0]),
-                (uint)(_vector.Values.Length << BitShiftSizeOf()));
+                (uint)(_vector.Values.Length << BitShiftHelpers.SizeOf<T>()));
         }
 
         public readonly unsafe T this[int index] => _vector[index];
@@ -218,14 +226,14 @@ namespace Vectors
 
         public readonly bool TryCopyTo(Span<byte> destination)
         {
-            if ((uint)destination.Length < (uint)_vector.Values.Length << BitShiftSizeOf())
+            if ((uint)destination.Length < (uint)_vector.Values.Length << BitShiftHelpers.SizeOf<T>())
             {
                 return false;
             }
 
             Unsafe.CopyBlockUnaligned(ref MemoryMarshal.GetReference(destination),
                 ref Unsafe.As<T, byte>(ref _vector.Values[0]),
-                (uint)(_vector.Values.Length << BitShiftSizeOf()));
+                (uint)(_vector.Values.Length << BitShiftHelpers.SizeOf<T>()));
             return true;
         }
 
@@ -238,7 +246,7 @@ namespace Vectors
 
             Unsafe.CopyBlockUnaligned(ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(destination)),
                 ref Unsafe.As<T, byte>(ref _vector.Values[0]),
-                (uint)(_vector.Values.Length << BitShiftSizeOf()));
+                (uint)(_vector.Values.Length << BitShiftHelpers.SizeOf<T>()));
             return true;
         }
 
@@ -813,13 +821,13 @@ namespace Vectors
         public static bool operator !=(Vector<T> left, Vector<T> right) => !(left == right);
 
 
+        //TODO Find way to merge branches since other than types, they all contain the same code
         //TODO Ensure constants are set correctly, is it worth making the constant for each type a variable in each if case?
         //There are functions in Register<T> to calculate them but that feels unnecessary since those are for generic cases
         //TODO Support 16 though 120 bit operations(i.e. 2-15 (s)bytes, 2-7 (u)shorts and 2-3 (u)ints/floats)
         //TODO Support 136 though 248 bit operations(i.e. 17-31 (s)bytes, 9-15 (u)shorts, 5-7 (u)ints/floats and 3 (u)longs/doubles)
-        //TODO Support arbitrary length operations where after processing all 256 and 128 bit groups, the number of
-        //remaining numbers is > 1, currently in the first two cases all numbers are ignored and in the last one only
-        //the first remaining number is considered
+        //currently in the these two cases all numbers are ignored
+        //TODO Optimise arbitrary length remainder(<128bit) code since the maximum size is fixed and so can be unrolled, more so for 32bit and perhaps 16bit numbers
         //This method performs addition on the vectors left and right.
         //If x86 vector extensions are supported then this method first handles the conversion of Vector<T>s to some
         //intermediate Vector128<U>/Vector256<U> where U is the same as T but has to be named differently to get around
@@ -905,14 +913,26 @@ namespace Vectors
                             remainingSubOperations -= blocks128.Length << 4;
                         }
 
-                        if (remainingSubOperations == 1)
+                        if (remainingSubOperations > 1)
+                        {
+                            byte[] values64 = new byte[remainingSubOperations];
+
+                            for (int i = 0; i < values64.Length; i++, processedSubOperations++)
+                            {
+                                values64[i] = (byte)((byte)(object)left._vector[processedSubOperations] +
+                                                      (byte)(object)right._vector[processedSubOperations]);
+                            }
+
+                            return Create(count, values64, blocks128, blocks256);
+                        }
+                        else if (remainingSubOperations == 1)
                         {
                             return Create(count,
                                 (byte)((byte)(object)left._vector[processedSubOperations] +
                                         (byte)(object)right._vector[processedSubOperations]), blocks128, blocks256);
                         }
 
-                        return Create(count, null, blocks128, blocks256);
+                        return Create(count, value: null, blocks128, blocks256);
                 }
             }
             else if (typeof(T) == typeof(sbyte))
@@ -987,14 +1007,26 @@ namespace Vectors
                             remainingSubOperations -= blocks128.Length << 4;
                         }
 
-                        if (remainingSubOperations == 1)
+                        if (remainingSubOperations > 1)
+                        {
+                            sbyte[] values64 = new sbyte[remainingSubOperations];
+
+                            for (int i = 0; i < values64.Length; i++, processedSubOperations++)
+                            {
+                                values64[i] = (sbyte)((sbyte)(object)left._vector[processedSubOperations] +
+                                                     (sbyte)(object)right._vector[processedSubOperations]);
+                            }
+
+                            return Create(count, values64, blocks128, blocks256);
+                        }
+                        else if (remainingSubOperations == 1)
                         {
                             return Create(count,
                                 (sbyte)((sbyte)(object)left._vector[processedSubOperations] +
                                         (sbyte)(object)right._vector[processedSubOperations]), blocks128, blocks256);
                         }
 
-                        return Create(count, null, blocks128, blocks256);
+                        return Create(count, value: null, blocks128, blocks256);
                 }
             }
             else if (typeof(T) == typeof(ushort))
@@ -1069,14 +1101,26 @@ namespace Vectors
                             remainingSubOperations -= blocks128.Length << 3;
                         }
 
-                        if (remainingSubOperations == 1)
+                        if (remainingSubOperations > 1)
+                        {
+                            ushort[] values64 = new ushort[remainingSubOperations];
+
+                            for (int i = 0; i < values64.Length; i++, processedSubOperations++)
+                            {
+                                values64[i] = (ushort)((ushort)(object)left._vector[processedSubOperations] +
+                                                       (ushort)(object)right._vector[processedSubOperations]);
+                            }
+
+                            return Create(count, values64, blocks128, blocks256);
+                        }
+                        else if (remainingSubOperations == 1)
                         {
                             return Create(count,
                                 (ushort)((ushort)(object)left._vector[processedSubOperations] +
                                          (ushort)(object)right._vector[processedSubOperations]), blocks128, blocks256);
                         }
 
-                        return Create(count, null, blocks128, blocks256);
+                        return Create(count, value: null, blocks128, blocks256);
                 }
             }
             else if (typeof(T) == typeof(short))
@@ -1151,14 +1195,26 @@ namespace Vectors
                             remainingSubOperations -= blocks128.Length << 3;
                         }
 
-                        if (remainingSubOperations == 1)
+                        if (remainingSubOperations > 1)
+                        {
+                            short[] values64 = new short[remainingSubOperations];
+
+                            for (int i = 0; i < values64.Length; i++, processedSubOperations++)
+                            {
+                                values64[i] = (short)((short)(object)left._vector[processedSubOperations] +
+                                                       (short)(object)right._vector[processedSubOperations]);
+                            }
+
+                            return Create(count, values64, blocks128, blocks256);
+                        }
+                        else if (remainingSubOperations == 1)
                         {
                             return Create(count,
                                 (short)((short)(object)left._vector[processedSubOperations] +
                                          (short)(object)right._vector[processedSubOperations]), blocks128, blocks256);
                         }
 
-                        return Create(count, null, blocks128, blocks256);
+                        return Create(count, value: null, blocks128, blocks256);
                 }
             }
             else if (typeof(T) == typeof(uint))
@@ -1233,14 +1289,26 @@ namespace Vectors
                             remainingSubOperations -= blocks128.Length << 2;
                         }
 
-                        if (remainingSubOperations == 1)
+                        if (remainingSubOperations > 1)
+                        {
+                            uint[] values64 = new uint[remainingSubOperations];
+
+                            for (int i = 0; i < values64.Length; i++, processedSubOperations++)
+                            {
+                                values64[i] = (uint)(object)left._vector[processedSubOperations] +
+                                              (uint)(object)right._vector[processedSubOperations];
+                            }
+
+                            return Create(count, values64, blocks128, blocks256);
+                        }
+                        else if (remainingSubOperations == 1)
                         {
                             return Create(count,
                                 (uint)(object)left._vector[processedSubOperations] +
                                 (uint)(object)right._vector[processedSubOperations], blocks128, blocks256);
                         }
 
-                        return Create(count, null, blocks128, blocks256);
+                        return Create(count, value: null, blocks128, blocks256);
                 }
             }
             else if (typeof(T) == typeof(int))
@@ -1315,14 +1383,26 @@ namespace Vectors
                             remainingSubOperations -= blocks128.Length << 2;
                         }
 
-                        if (remainingSubOperations == 1)
+                        if (remainingSubOperations > 1)
+                        {
+                            int[] values64 = new int[remainingSubOperations];
+
+                            for (int i = 0; i < values64.Length; i++, processedSubOperations++)
+                            {
+                                values64[i] = (int)(object)left._vector[processedSubOperations] +
+                                              (int)(object)right._vector[processedSubOperations];
+                            }
+
+                            return Create(count, values64, blocks128, blocks256);
+                        }
+                        else if (remainingSubOperations == 1)
                         {
                             return Create(count,
                                 (int)(object)left._vector[processedSubOperations] +
                                 (int)(object)right._vector[processedSubOperations], blocks128, blocks256);
                         }
 
-                        return Create(count, null, blocks128, blocks256);
+                        return Create(count, value: null, blocks128, blocks256);
                 }
             }
             else if (typeof(T) == typeof(ulong))
@@ -1342,6 +1422,7 @@ namespace Vectors
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
                         return Create((ulong)(object)left._vector[0] + (ulong)(object)right._vector[0]);
+                    //TODO Remove comment and those like it when appropriate
                     //Temporary fallback, there are missing x86 cases that could be added for extra performance
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
@@ -1400,7 +1481,7 @@ namespace Vectors
                                 (ulong)(object)right._vector[processedSubOperations], blocks128, blocks256);
                         }
 
-                        return Create(count, null, blocks128, blocks256);
+                        return Create(count, value: null, blocks128, blocks256);
                 }
             }
             else if (typeof(T) == typeof(long))
@@ -1478,7 +1559,7 @@ namespace Vectors
                                 (long)(object)right._vector[processedSubOperations], blocks128, blocks256);
                         }
 
-                        return Create(count, null, blocks128, blocks256);
+                        return Create(count, value: null, blocks128, blocks256);
                 }
             }
             else if (typeof(T) == typeof(float))
@@ -1553,14 +1634,26 @@ namespace Vectors
                             remainingSubOperations -= blocks128.Length << 2;
                         }
 
-                        if (remainingSubOperations == 1)
+                        if (remainingSubOperations > 1)
+                        {
+                            float[] values64 = new float[remainingSubOperations];
+
+                            for (int i = 0; i < values64.Length; i++, processedSubOperations++)
+                            {
+                                values64[i] = (float)(object)left._vector[processedSubOperations] +
+                                              (float)(object)right._vector[processedSubOperations];
+                            }
+
+                            return Create(count, values64, blocks128, blocks256);
+                        }
+                        else if (remainingSubOperations == 1)
                         {
                             return Create(count,
                                 (float)(object)left._vector[processedSubOperations] +
                                 (float)(object)right._vector[processedSubOperations], blocks128, blocks256);
                         }
 
-                        return Create(count, null, blocks128, blocks256);
+                        return Create(count, value: null, blocks128, blocks256);
                 }
             }
             else if (typeof(T) == typeof(double))
@@ -1638,60 +1731,8 @@ namespace Vectors
                                 (double)(object)right._vector[processedSubOperations], blocks128, blocks256);
                         }
 
-                        return Create(count, null, blocks128, blocks256);
+                        return Create(count, value: null, blocks128, blocks256);
                 }
-            }
-            else
-            {
-                throw new NotSupportedException();
-            }
-        }
-
-
-        //This is the result of log_2(Unsafe.SizeOf<T>) and is designed to be used
-        //as "a << SizeOf<T>()" wherever "a * Unsafe.SizeOf<T>()" might be used
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal static int BitShiftSizeOf()
-        {
-            if (typeof(T) == typeof(byte))
-            {
-                return 0;
-            }
-            else if (typeof(T) == typeof(sbyte))
-            {
-                return 0;
-            }
-            else if (typeof(T) == typeof(ushort))
-            {
-                return 1;
-            }
-            else if (typeof(T) == typeof(short))
-            {
-                return 1;
-            }
-            else if (typeof(T) == typeof(uint))
-            {
-                return 2;
-            }
-            else if (typeof(T) == typeof(int))
-            {
-                return 2;
-            }
-            else if (typeof(T) == typeof(ulong))
-            {
-                return 3;
-            }
-            else if (typeof(T) == typeof(long))
-            {
-                return 3;
-            }
-            else if (typeof(T) == typeof(float))
-            {
-                return 2;
-            }
-            else if (typeof(T) == typeof(double))
-            {
-                return 3;
             }
             else
             {
