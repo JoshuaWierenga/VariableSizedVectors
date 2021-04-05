@@ -92,14 +92,14 @@ namespace Vectors
         [FieldOffset(21)]
         private readonly byte* ElementType;
 #endif
-
+        //Creates a new Register that can hold count values of a specified type
 #if DEBUG
-        private Register(Type type, int typeSize, int count, bool constant = false)
+        //TODO remove type and just use typeSize + signed bool or an enum?
+        private Register(Type type, int typeSize, int count, int bitShiftTypeSize, bool constant = false)
 #else
-        private Register(int typeSize, int count, bool constant = false)
+        private Register(int count, int bitShiftTypeSize, bool constant = false)
 #endif
         {
-            pUInt8Values = default;
             pInt8Values = default;
             pUInt16Values = default;
             pInt16Values = default;
@@ -110,28 +110,8 @@ namespace Vectors
             pBinary32Values = default;
             pBinary64Values = default;
 
-            switch (typeSize)
-            {
-                //TODO Determine if Unsafe.As or fixed is quicker
-                case 8:
-                    sbyte[] sbytes = new sbyte[count];
-                    pInt8Values = (sbyte*)Unsafe.As<sbyte[], IntPtr>(ref sbytes).ToPointer();
-                    break;
-                case 16:
-                    short[] int16s = new short[count];
-                    pInt16Values = (short*)Unsafe.As<short[], IntPtr>(ref int16s).ToPointer();
-                    break;
-                case 32:
-                    int[] int32s = new int[count];
-                    pInt32Values = (int*)Unsafe.As<int[], IntPtr>(ref int32s).ToPointer();
-                    break;
-                case 64:
-                    long[] int64s = new long[count];
-                    pInt64Values = (long*)Unsafe.As<long[], IntPtr>(ref int64s).ToPointer();
-                    break;
-                default:
-                    throw new NotSupportedException();
-            }
+            byte[] bytes = new byte[count << bitShiftTypeSize];
+            pUInt8Values = (byte*)Unsafe.As<byte[], IntPtr>(ref bytes).ToPointer();
 
             Constant = constant;
             Length = count;
@@ -139,336 +119,44 @@ namespace Vectors
             //Used in RegisterDebugView to make appropriately sized arrays for each type 
             ElementSize = typeSize / 8;
 
-            //Used in DebugToString which needs to know the correct type
+            //ElementType and ElementTypeLength is used in DebugToString which needs to know the correct type
             //Can't store Type, String or byte[] with FieldOffset so using byte*
-            byte[] typeName = Encoding.Default.GetBytes(type.FullName);
-            fixed (byte* pTypeName = typeName)
+#nullable enable
+            string? typeFullName = type.FullName;
+#nullable disable
+            if (typeFullName is not null)
             {
-                ElementType = pTypeName;
-            }
+                byte[] typeName = Encoding.Default.GetBytes(typeFullName);
+                fixed (byte* pTypeName = typeName)
+                {
+                    ElementType = pTypeName;
+                }
 
-            ElementTypeLength = typeName.Length;
-#endif
-        }
-
-
-        //TODO Remove or Use
-        //Creates a new Register that can hold 256 bits of the specified type
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Register Create256<T>(bool constant = false) where T : struct
-        {
-            if (typeof(T) == typeof(byte))
-            {
-                return new Register(
-#if DEBUG
-                typeof(T),
-#endif
-                8, NumberIn256Bits<T>(), constant);
-
-            }
-            else if (typeof(T) == typeof(sbyte))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    8, NumberIn256Bits<T>(), constant);
-            }
-            else if (typeof(T) == typeof(ushort))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    16, NumberIn256Bits<T>(), constant);
-            }
-            else if (typeof(T) == typeof(short))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    16, NumberIn256Bits<T>(), constant);
-            }
-            else if (typeof(T) == typeof(uint))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    32, NumberIn256Bits<T>(), constant);
-            }
-            else if (typeof(T) == typeof(int))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    32, NumberIn256Bits<T>(), constant);
-            }
-            else if (typeof(T) == typeof(ulong))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    64, NumberIn256Bits<T>(), constant);
-            }
-            else if (typeof(T) == typeof(long))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    64, NumberIn256Bits<T>(), constant);
-            }
-            else if (typeof(T) == typeof(float))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    32, NumberIn256Bits<T>(), constant);
-            }
-            else if (typeof(T) == typeof(double))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    64, NumberIn256Bits<T>(), constant);
+                ElementTypeLength = typeName.Length;
             }
             else
             {
-                throw new NotSupportedException();
+                ElementType = default;
+                ElementTypeLength = 0;
             }
+#endif
         }
 
-        //Creates a new Register that can hold count values of a specified type
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Register Create<T>(int count) where T : struct
-        {
-            if (typeof(T) == typeof(byte))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    8, count);
-            }
-            else if (typeof(T) == typeof(sbyte))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    8, count);
-            }
-            else if (typeof(T) == typeof(ushort))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    16, count);
-            }
-            else if (typeof(T) == typeof(short))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    16, count);
-            }
-            else if (typeof(T) == typeof(uint))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    32, count);
-            }
-            else if (typeof(T) == typeof(int))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    32, count);
-            }
-            else if (typeof(T) == typeof(ulong))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    64, count);
-            }
-            else if (typeof(T) == typeof(long))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    64, count);
-            }
-            else if (typeof(T) == typeof(float))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    32, count);
-            }
-            else if (typeof(T) == typeof(double))
-            {
-                return new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    64, count);
-            }
-            else
-            {
-                throw new NotSupportedException();
-            }
-        }
 
         //Creates a new Register that can hold a constant. Constant here means that the 
         //constant will be accessible regardless of any indexing and will be compatible
         //with x86 vector extensions which at a maximum require a 256 bit vector.
         internal static Register CreateConstant<T>(T value) where T : struct
         {
-            Register register;
+            Register register = new(
+#if DEBUG
+                typeof(T), SizeOf<T>(),
+#endif
+                NumberIn256Bits<T>(), BitShiftHelpers.SizeOf<T>(), true);
 
-            //TODO Remove for loops from cases, loop counter maximum and left shift amount are
-            //constants for a given type
-            //TODO Determine if the typeof compile optimisation works if branches are merged
-            if (typeof(T) == typeof(byte))
+            for (int i = 0; i < NumberIn256Bits<T>(); i++)
             {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    8, NumberIn256Bits<T>(), true);
-                for (int i = 0; i < 32; i++)
-                {
-                    Unsafe.WriteUnaligned(ref register.pUInt8Values[i], value);
-                }
-            }
-            else if (typeof(T) == typeof(sbyte))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    8, NumberIn256Bits<T>(), true);
-                for (int i = 0; i < 32; i++)
-                {
-                    //TODO Test if this works
-                    Unsafe.WriteUnaligned(ref register.pUInt8Values[i], value);
-                }
-            }
-            else if (typeof(T) == typeof(ushort))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    16, NumberIn256Bits<T>(), true);
-                for (int i = 0; i < 16; i++)
-                {
-                    //TODO Ensure this works
-                    Unsafe.WriteUnaligned(ref register.pUInt8Values[i << 1], value);
-                }
-            }
-            else if (typeof(T) == typeof(short))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    16, NumberIn256Bits<T>(), true);
-                for (int i = 0; i < 16; i++)
-                {
-                    Unsafe.WriteUnaligned(ref register.pUInt8Values[i << 1], value);
-                }
-            }
-            else if (typeof(T) == typeof(uint))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    32, NumberIn256Bits<T>(), true);
-                for (int i = 0; i < 8; i++)
-                {
-                    Unsafe.WriteUnaligned(ref register.pUInt8Values[i << 2], value);
-                }
-            }
-            else if (typeof(T) == typeof(int))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    32, NumberIn256Bits<T>(), true);
-                for (int i = 0; i < 8; i++)
-                {
-                    Unsafe.WriteUnaligned(ref register.pUInt8Values[i << 2], value);
-                }
-            }
-            else if (typeof(T) == typeof(ulong))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    64, NumberIn256Bits<T>(), true);
-                for (int i = 0; i < 4; i++)
-                {
-                    Unsafe.WriteUnaligned(ref register.pUInt8Values[i << 3], value);
-                }
-            }
-            else if (typeof(T) == typeof(long))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    64, NumberIn256Bits<T>(), true);
-                for (int i = 0; i < 4; i++)
-                {
-                    Unsafe.WriteUnaligned(ref register.pUInt8Values[i << 3], value);
-                }
-            }
-            else if (typeof(T) == typeof(float))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    32, NumberIn256Bits<T>(), true);
-                for (int i = 0; i < 8; i++)
-                {
-                    Unsafe.WriteUnaligned(ref register.pUInt8Values[i << 2], value);
-                }
-            }
-            else if (typeof(T) == typeof(double))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    64, NumberIn256Bits<T>(), true);
-                for (int i = 0; i < 4; i++)
-                {
-                    Unsafe.WriteUnaligned(ref register.pUInt8Values[i << 3], value);
-                }
-            }
-            else
-            {
-                throw new NotSupportedException();
+                Unsafe.WriteUnaligned(ref register.pUInt8Values[i << BitShiftHelpers.SizeOf<T>()], value);
             }
 
             return register;
@@ -477,103 +165,26 @@ namespace Vectors
         //Creates a new Register that holds the given value of type T
         internal static Register Create<T>(T value) where T : struct
         {
-            Register register;
-
-            if (typeof(T) == typeof(byte))
-            {
-                register = new Register(
+            Register register = new(
 #if DEBUG
-                    typeof(T),
+                typeof(T), SizeOf<T>(),
 #endif
-                    8, 1);
-            }
-            else if (typeof(T) == typeof(sbyte))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    8, 1);
-            }
-            else if (typeof(T) == typeof(ushort))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    16, 1);
-            }
-            else if (typeof(T) == typeof(short))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    16, 1);
-            }
-            else if (typeof(T) == typeof(uint))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    32, 1);
-            }
-            else if (typeof(T) == typeof(int))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    32, 1);
-            }
-            else if (typeof(T) == typeof(ulong))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    64, 1);
-            }
-            else if (typeof(T) == typeof(long))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    64, 1);
-            }
-            else if (typeof(T) == typeof(float))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    32, 1);
-            }
-            else if (typeof(T) == typeof(double))
-            {
-                register = new Register(
-#if DEBUG
-                    typeof(T),
-#endif
-                    64, 1);
-            }
-            else
-            {
-                throw new NotSupportedException();
-            }
+                1, BitShiftHelpers.SizeOf<T>());
 
             Unsafe.WriteUnaligned(ref register.pUInt8Values[0], value);
 
             return register;
         }
 
-        //TODO remove BitShiftHelpers.SizeOf<T>() and just ask caller for size of type?
+        //TODO remove SizeOf<T>() and BitShiftHelpers.SizeOf<T>() and just ask caller for size of type?
         //Creates a new Register that holds the given values of type T
         internal static Register Create<T>(T[] values) where T : struct
         {
-            Register register = Create<T>(values.Length);
+            Register register = new(
+#if DEBUG
+                typeof(T), SizeOf<T>(),
+#endif
+                 values.Length, BitShiftHelpers.SizeOf<T>());
 
             Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[0], ref Unsafe.As<T, byte>(ref values[0]),
                 (uint)(values.Length << BitShiftHelpers.SizeOf<T>()));
@@ -585,7 +196,11 @@ namespace Vectors
         //Needed since x86 vector extension operations cannot handle VectorX<T> only VectorX<SomeTypeHere>, at least in c#
         internal static Register Create<T>(int count, Vector128<T> values) where T : struct
         {
-            Register register = Create<T>(count);
+            Register register = new(
+#if DEBUG
+                typeof(T), SizeOf<T>(),
+#endif
+                count, BitShiftHelpers.SizeOf<T>());
 
             Unsafe.WriteUnaligned(ref register.pUInt8Values[0], values);
 
@@ -595,7 +210,11 @@ namespace Vectors
         //Creates a new Register that holds all the values from block128 and then value at the end
         internal static Register Create<T>(int count, Vector128<T> block128, T value) where T : struct
         {
-            Register register = Create<T>(count);
+            Register register = new(
+#if DEBUG
+                typeof(T), SizeOf<T>(),
+#endif
+                count, BitShiftHelpers.SizeOf<T>());
 
             Unsafe.WriteUnaligned(ref register.pUInt8Values[0], block128);
             Unsafe.WriteUnaligned(ref register.pUInt8Values[16], value);
@@ -603,14 +222,17 @@ namespace Vectors
             return register;
         }
 
-        //TODO remove BitShiftHelpers.SizeOf<T>() and just ask caller for size of type?
+        //TODO remove SizeOf<T>() and BitShiftHelpers.SizeOf<T>() and just ask caller for size of type?
         //Creates a new Register that holds all the values from block128 and then the given values
         internal static Register Create<T>(int count, Vector128<T> block128, T[] values) where T : struct
         {
-            Register register = Create<T>(count);
+            Register register = new(
+#if DEBUG
+                typeof(T), SizeOf<T>(),
+#endif
+                count, BitShiftHelpers.SizeOf<T>());
 
             Unsafe.WriteUnaligned(ref register.pUInt8Values[0], block128);
-            //TODO Figure out why the old version of this line used 16 bytes, was it important?
             Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[16], ref Unsafe.As<T, byte>(ref values[0]),
                 (uint)(values.Length << BitShiftHelpers.SizeOf<T>()));
 
@@ -621,7 +243,11 @@ namespace Vectors
         //Used for Sse2 fallback of 256 bit vectors
         internal static Register Create<T>(int count, Vector128<T> firstBlock128, Vector128<T> secondBlock128) where T : struct
         {
-            Register register = Create<T>(count);
+            Register register = new(
+#if DEBUG
+                typeof(T), SizeOf<T>(),
+#endif
+                count, BitShiftHelpers.SizeOf<T>());
 
             Unsafe.WriteUnaligned(ref register.pUInt8Values[0], firstBlock128);
             Unsafe.WriteUnaligned(ref register.pUInt8Values[16], secondBlock128);
@@ -633,15 +259,18 @@ namespace Vectors
         //See comment on Vector128<T> Create function
         internal static Register Create<T>(int count, Vector256<T> values) where T : struct
         {
-            Register register = Create<T>(count);
+            Register register = new(
+#if DEBUG
+                typeof(T), SizeOf<T>(),
+#endif
+                count, BitShiftHelpers.SizeOf<T>());
 
             Unsafe.WriteUnaligned(ref register.pUInt8Values[0], values);
 
             return register;
         }
 
-        //TODO Check overload hidden warning
-        //TODO remove BitShiftHelpers.SizeOf<T>() and just ask caller for size of type?
+        //TODO remove SizeOf<T>() and BitShiftHelpers.SizeOf<T>() and just ask caller for size of type?
         //Creates a new Register that holds all the values from blocks256(optional) and then all values from
         //blocks128(optional) and then finally value(optional) goes on the end
         //Note that despite the fact that all parameters are optional, at least one must be given
@@ -653,12 +282,20 @@ namespace Vectors
                 //TODO Revert, this is just temporary to prevent crashes
                 //this can be removed once operations can handle all vector sizes
                 //throw new ArgumentNullException();
-                return Create<T>(count);
+                return new Register(
+#if DEBUG
+                    typeof(T), SizeOf<T>(),
+#endif
+                    count, BitShiftHelpers.SizeOf<T>());
             }
 
             int processed = 0;
 
-            Register register = Create<T>(count);
+            Register register = new(
+#if DEBUG
+                typeof(T), SizeOf<T>(),
+#endif
+                count, BitShiftHelpers.SizeOf<T>());
 
             if (blocks256 != null)
             {
@@ -672,7 +309,6 @@ namespace Vectors
             {
                 int count128 = blocks128.Length << BitShiftAmountIn128Bit<T>();
 
-                //TODO Ensure the register offset works
                 Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[processed << 3],
                     ref Unsafe.As<Vector128<T>, byte>(ref blocks128[0]), (uint)(count128 << 3));
 
@@ -681,15 +317,13 @@ namespace Vectors
 
             if (value != null)
             {
-                //TODO Ensure the register offset works
                 Unsafe.WriteUnaligned(ref register.pUInt8Values[processed << 3], value.Value);
             }
 
             return register;
         }
 
-        //TODO Check overload hidden warning
-        //TODO remove BitShiftHelpers.SizeOf<T>() and just ask caller for size of type?
+        //TODO remove SizeOf<T>() and BitShiftHelpers.SizeOf<T>() and just ask caller for size of type?
         //Add(...) does have the relevant values and might soon have the values as variables
         //See comment on Vector128<U> Create function
         //Constructs a new vector with all values from blocks256(optional) and then all values from blocks128(optional) and then finally value(optional) goes on the end
@@ -702,12 +336,20 @@ namespace Vectors
                 //TODO Revert, this is just temporary to prevent crashes
                 //this can be removed once operations can handle all vector sizes
                 //throw new ArgumentNullException();
-                return Create<T>(count);
+                return new Register(
+#if DEBUG
+                    typeof(T), SizeOf<T>(),
+#endif
+                    count, BitShiftHelpers.SizeOf<T>());
             }
 
             int processed = 0;
 
-            Register register = Create<T>(count);
+            Register register = new(
+#if DEBUG
+                typeof(T), SizeOf<T>(),
+#endif
+                count, BitShiftHelpers.SizeOf<T>());
 
             if (blocks256 != null)
             {
@@ -737,7 +379,6 @@ namespace Vectors
         }
 
         //TODO Add Vector128<alltypes> unioned fields
-        //TODO Ensure these work with the new UInt64 index
         //TODO Decide if this should work as it does now and return adjacent vectors or should they overlap such that
         //the index has to increase by 2/4 to get an adjacent vector
         //TODO Decide if these need bounds checking for non constants. Provided at least some values in the subvector
@@ -914,6 +555,58 @@ namespace Vectors
             }
         }
 
+        //Compile time constants from Unsafe.SizeOf<T>()
+        //gives the size of each supported type in bits
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int SizeOf<T>()
+        {
+            if (typeof(T) == typeof(byte))
+            {
+                return 8;
+            }
+            else if (typeof(T) == typeof(sbyte))
+            {
+                return 8;
+            }
+            else if (typeof(T) == typeof(ushort))
+            {
+                return 16;
+            }
+            else if (typeof(T) == typeof(short))
+            {
+                return 16;
+            }
+            else if (typeof(T) == typeof(uint))
+            {
+                return 32;
+            }
+            else if (typeof(T) == typeof(int))
+            {
+                return 32;
+            }
+            else if (typeof(T) == typeof(ulong))
+            {
+                return 64;
+            }
+            else if (typeof(T) == typeof(long))
+            {
+                return 64;
+            }
+            else if (typeof(T) == typeof(float))
+            {
+                return 32;
+            }
+            else if (typeof(T) == typeof(double))
+            {
+                return 64;
+            }
+            else
+            {
+                throw new NotSupportedException();
+            }
+        }
+
+
         //TODO Use or Remove
         //This is the result of 128/(Unsafe.SizeOf<T>*8)
         /*[MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -1016,37 +709,52 @@ namespace Vectors
         }
 
 
-        internal unsafe string DebugToString
+        internal string DebugToString
         {
             get
             {
 #if DEBUG
+                if (ElementType is null)
+                {
+                    return "";
+                }
+
+                //Get stored type from ElementType
+                byte[] items = new byte[ElementTypeLength];
+                Marshal.Copy((IntPtr)ElementType, items, 0, ElementTypeLength);
+#nullable enable
+                Type? storedType = Type.GetType(Encoding.Default.GetString(items));
+#nullable disable
+                if (storedType is null)
+                {
+                    return "";
+                }
+
+                MethodInfo methodInfo = typeof(Register)
+                    .GetMethod("GetValue", BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?.MakeGenericMethod(storedType);
+
                 StringBuilder sb = new();
                 string separator = NumberFormatInfo.CurrentInfo.NumberGroupSeparator;
 
-                byte[] items = new byte[ElementTypeLength];
-                Marshal.Copy((IntPtr)ElementType, items, 0, ElementTypeLength);
-                Type storedType = Type.GetType(Encoding.Default.GetString(items));
-
-                MethodInfo methodInfo = typeof(Register).GetMethod("GetValue", BindingFlags.Instance | BindingFlags.NonPublic)
-                    .MakeGenericMethod(storedType);
-
                 sb.Append('<');
-                object firstNum = methodInfo.Invoke(this, new object[] { 0 });
-                sb.Append(((IFormattable)firstNum).ToString("G",
+                object firstNum = methodInfo?.Invoke(this, new object[] { 0 });
+
+                sb.Append(((IFormattable)firstNum)?.ToString("G",
                     CultureInfo.CurrentCulture));
 
                 for (int i = 1; i < Length; i++)
                 {
                     sb.Append(separator);
                     sb.Append(' ');
-                    sb.Append(((IFormattable)methodInfo.Invoke(null, new object[] { i })).ToString("G", CultureInfo.CurrentCulture));
+                    sb.Append(((IFormattable)methodInfo?.Invoke(this, new object[] { i }))?.ToString("G", CultureInfo.CurrentCulture));
                 }
 
                 sb.Append('>');
                 return sb.ToString();
-#endif
+#else
                 return "";
+#endif
             }
         }
 
