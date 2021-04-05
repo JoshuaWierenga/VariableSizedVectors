@@ -879,7 +879,7 @@ namespace Vectors
                 {
                     case 32 when IntrinsicSupport.IsAvx2Supported:
                         return Create(count,
-                            Avx2.Add(left._vector.ToVector256<byte>(0), right._vector.ToVector256<byte>(0)));
+                            Avx2.Add(left._vector.GetVector256Byte(0), right._vector.GetVector256Byte(0)));
                     case < 32 and > 16 when IntrinsicSupport.IsSse2Supported:
                         Vector128<byte> lower128 = Sse2.Add(left._vector.GetVector128Byte(0),
                             right._vector.GetVector128Byte(0));
@@ -931,8 +931,8 @@ namespace Vectors
 
                             for (int i = 0; i < blocks256.Length; i++)
                             {
-                                blocks256[i] = Avx2.Add(left._vector.ToVector256<byte>(i),
-                                    right._vector.ToVector256<byte>(i));
+                                blocks256[i] = Avx2.Add(left._vector.GetVector256Byte(i),
+                                    right._vector.GetVector256Byte(i));
                             }
 
                             processedSubOperations = blocks256.Length << 5;
@@ -982,7 +982,7 @@ namespace Vectors
                 {
                     case 32 when IntrinsicSupport.IsAvx2Supported:
                         return Create(count,
-                            Avx2.Add(left._vector.ToVector256<sbyte>(0), right._vector.ToVector256<sbyte>(0)));
+                            Avx2.Add(left._vector.GetVector256SByte(0), right._vector.GetVector256SByte(0)));
                     case < 32 and > 16 when IntrinsicSupport.IsSse2Supported:
                         Vector128<sbyte> lower128 = Sse2.Add(left._vector.GetVector128SByte(0),
                             right._vector.GetVector128SByte(0));
@@ -1034,8 +1034,8 @@ namespace Vectors
 
                             for (int i = 0; i < blocks256.Length; i++)
                             {
-                                blocks256[i] = Avx2.Add(left._vector.ToVector256<sbyte>(i),
-                                    right._vector.ToVector256<sbyte>(i));
+                                blocks256[i] = Avx2.Add(left._vector.GetVector256SByte(i),
+                                    right._vector.GetVector256SByte(i));
                             }
 
                             processedSubOperations = blocks256.Length << 5;
@@ -1085,7 +1085,7 @@ namespace Vectors
                 {
                     case 16 when IntrinsicSupport.IsAvx2Supported:
                         return Create(count,
-                            Avx2.Add(left._vector.ToVector256<ushort>(0), right._vector.ToVector256<ushort>(0)));
+                            Avx2.Add(left._vector.GetVector256UShort(0), right._vector.GetVector256UShort(0)));
                     case < 16 and > 8 when IntrinsicSupport.IsSse2Supported:
                         Vector128<ushort> lower128 = Sse2.Add(left._vector.GetVector128UShort(0),
                             right._vector.GetVector128UShort(0));
@@ -1137,8 +1137,8 @@ namespace Vectors
 
                             for (int i = 0; i < blocks256.Length; i++)
                             {
-                                blocks256[i] = Avx2.Add(left._vector.ToVector256<ushort>(i),
-                                    right._vector.ToVector256<ushort>(i));
+                                blocks256[i] = Avx2.Add(left._vector.GetVector256UShort(i),
+                                    right._vector.GetVector256UShort(i));
                             }
 
                             processedSubOperations = blocks256.Length << 4;
@@ -1188,7 +1188,7 @@ namespace Vectors
                 {
                     case 16 when IntrinsicSupport.IsAvx2Supported:
                         return Create(count,
-                            Avx2.Add(left._vector.ToVector256<short>(0), right._vector.ToVector256<short>(0)));
+                            Avx2.Add(left._vector.GetVector256Short(0), right._vector.GetVector256Short(0)));
                     case < 16 and > 8 when IntrinsicSupport.IsSse2Supported:
                         Vector128<short> lower128 = Sse2.Add(left._vector.GetVector128Short(0),
                             right._vector.GetVector128Short(0));
@@ -1240,8 +1240,8 @@ namespace Vectors
 
                             for (int i = 0; i < blocks256.Length; i++)
                             {
-                                blocks256[i] = Avx2.Add(left._vector.ToVector256<short>(i),
-                                    right._vector.ToVector256<short>(i));
+                                blocks256[i] = Avx2.Add(left._vector.GetVector256Short(i),
+                                    right._vector.GetVector256Short(i));
                             }
 
                             processedSubOperations = blocks256.Length << 4;
@@ -1291,7 +1291,7 @@ namespace Vectors
                 {
                     case 8 when IntrinsicSupport.IsAvx2Supported:
                         return Create(count,
-                            Avx2.Add(left._vector.ToVector256<uint>(0), right._vector.ToVector256<uint>(0)));
+                            Avx2.Add(left._vector.GetVector256UInt(0), right._vector.GetVector256UInt(0)));
                     case < 8 and > 4 when IntrinsicSupport.IsSse2Supported:
                         Vector128<uint> lower128 = Sse2.Add(left._vector.GetVector128UInt(0),
                             right._vector.GetVector128UInt(0));
@@ -1343,8 +1343,8 @@ namespace Vectors
 
                             for (int i = 0; i < blocks256.Length; i++)
                             {
-                                blocks256[i] = Avx2.Add(left._vector.ToVector256<uint>(i),
-                                    right._vector.ToVector256<uint>(i));
+                                blocks256[i] = Avx2.Add(left._vector.GetVector256UInt(i),
+                                    right._vector.GetVector256UInt(i));
                             }
 
                             processedSubOperations = blocks256.Length << 3;
@@ -1394,7 +1394,7 @@ namespace Vectors
                 {
                     case 8 when IntrinsicSupport.IsAvx2Supported:
                         return Create(count,
-                            Avx2.Add(left._vector.ToVector256<int>(0), right._vector.ToVector256<int>(0)));
+                            Avx2.Add(left._vector.GetVector256Int(0), right._vector.GetVector256Int(0)));
                     case < 8 and > 4 when IntrinsicSupport.IsSse2Supported:
                         Vector128<int> lower128 = Sse2.Add(left._vector.GetVector128Int(0),
                             right._vector.GetVector128Int(0));
@@ -1446,8 +1446,8 @@ namespace Vectors
 
                             for (int i = 0; i < blocks256.Length; i++)
                             {
-                                blocks256[i] = Avx2.Add(left._vector.ToVector256<int>(i),
-                                    right._vector.ToVector256<int>(i));
+                                blocks256[i] = Avx2.Add(left._vector.GetVector256Int(i),
+                                    right._vector.GetVector256Int(i));
                             }
 
                             processedSubOperations = blocks256.Length << 3;
@@ -1497,7 +1497,7 @@ namespace Vectors
                 {
                     case 4 when IntrinsicSupport.IsAvx2Supported:
                         return Create(count,
-                            Avx2.Add(left._vector.ToVector256<ulong>(0), right._vector.ToVector256<ulong>(0)));
+                            Avx2.Add(left._vector.GetVector256ULong(0), right._vector.GetVector256ULong(0)));
                     case 3 when IntrinsicSupport.IsSse2Supported:
                         Vector128<ulong> lower128 = Sse2.Add(left._vector.GetVector128ULong(0),
                             right._vector.GetVector128ULong(0));
@@ -1540,8 +1540,8 @@ namespace Vectors
 
                             for (int i = 0; i < blocks256.Length; i++)
                             {
-                                blocks256[i] = Avx2.Add(left._vector.ToVector256<ulong>(i),
-                                    right._vector.ToVector256<ulong>(i));
+                                blocks256[i] = Avx2.Add(left._vector.GetVector256ULong(i),
+                                    right._vector.GetVector256ULong(i));
                             }
 
                             processedSubOperations = blocks256.Length << 2;
@@ -1579,7 +1579,7 @@ namespace Vectors
                 {
                     case 4 when IntrinsicSupport.IsAvx2Supported:
                         return Create(count,
-                            Avx2.Add(left._vector.ToVector256<long>(0), right._vector.ToVector256<long>(0)));
+                            Avx2.Add(left._vector.GetVector256Long(0), right._vector.GetVector256Long(0)));
                     case 3 when IntrinsicSupport.IsSse2Supported:
                         Vector128<long> lower128 = Sse2.Add(left._vector.GetVector128Long(0),
                             right._vector.GetVector128Long(0));
@@ -1622,8 +1622,8 @@ namespace Vectors
 
                             for (int i = 0; i < blocks256.Length; i++)
                             {
-                                blocks256[i] = Avx2.Add(left._vector.ToVector256<long>(i),
-                                    right._vector.ToVector256<long>(i));
+                                blocks256[i] = Avx2.Add(left._vector.GetVector256Long(i),
+                                    right._vector.GetVector256Long(i));
                             }
 
                             processedSubOperations = blocks256.Length << 2;
@@ -1661,7 +1661,7 @@ namespace Vectors
                 {
                     case 8 when IntrinsicSupport.IsAvxSupported:
                         return Create(count,
-                            Avx.Add(left._vector.ToVector256<float>(0), right._vector.ToVector256<float>(0)));
+                            Avx.Add(left._vector.GetVector256Float(0), right._vector.GetVector256Float(0)));
                     case < 8 and > 4 when IntrinsicSupport.IsSseSupported:
                         Vector128<float> lower128 = Sse.Add(left._vector.GetVector128Float(0),
                             right._vector.GetVector128Float(0));
@@ -1714,8 +1714,8 @@ namespace Vectors
 
                             for (int i = 0; i < blocks256.Length; i++)
                             {
-                                blocks256[i] = Avx.Add(left._vector.ToVector256<float>(i),
-                                    right._vector.ToVector256<float>(i));
+                                blocks256[i] = Avx.Add(left._vector.GetVector256Float(i),
+                                    right._vector.GetVector256Float(i));
                             }
 
                             processedSubOperations = blocks256.Length << 3;
@@ -1765,7 +1765,7 @@ namespace Vectors
                 {
                     case 4 when IntrinsicSupport.IsAvxSupported:
                         return Create(count,
-                            Avx.Add(left._vector.ToVector256<double>(0), right._vector.ToVector256<double>(0)));
+                            Avx.Add(left._vector.GetVector256Double(0), right._vector.GetVector256Double(0)));
                     case 3 when IntrinsicSupport.IsSse2Supported:
                         Vector128<double> lower128 = Sse2.Add(left._vector.GetVector128Double(0),
                             right._vector.GetVector128Double(0));
@@ -1809,8 +1809,8 @@ namespace Vectors
 
                             for (int i = 0; i < blocks256.Length; i++)
                             {
-                                blocks256[i] = Avx.Add(left._vector.ToVector256<double>(i),
-                                    right._vector.ToVector256<double>(i));
+                                blocks256[i] = Avx.Add(left._vector.GetVector256Double(i),
+                                    right._vector.GetVector256Double(i));
                             }
 
                             processedSubOperations = blocks256.Length << 2;

@@ -96,6 +96,37 @@ namespace Vectors
         [FieldOffset(5)]
         private readonly Vector128<double>* pVector128Binary64Values;
 
+
+        [FieldOffset(5)]
+        internal readonly Vector256<byte>* pVector256UInt8Values;
+
+        [FieldOffset(5)]
+        private readonly Vector256<sbyte>* pVector256Int8Values;
+
+        [FieldOffset(5)]
+        private readonly Vector256<ushort>* pVector256UInt16Values;
+
+        [FieldOffset(5)]
+        private readonly Vector256<short>* pVector256Int16Values;
+
+        [FieldOffset(5)]
+        private readonly Vector256<uint>* pVector256UInt32Values;
+
+        [FieldOffset(5)]
+        private readonly Vector256<int>* pVector256Int32Values;
+
+        [FieldOffset(5)]
+        private readonly Vector256<ulong>* pVector256UInt64Values;
+
+        [FieldOffset(5)]
+        private readonly Vector256<long>* pVector256Int64Values;
+
+        [FieldOffset(5)]
+        private readonly Vector256<float>* pVector256Binary32Values;
+
+        [FieldOffset(5)]
+        private readonly Vector256<double>* pVector256Binary64Values;
+
 #if DEBUG
         [FieldOffset(13)]
         internal readonly int ElementSize;
@@ -104,6 +135,7 @@ namespace Vectors
         [FieldOffset(21)]
         private readonly byte* ElementType;
 #endif
+
         //Creates a new Register that can hold count values of a specified type
 #if DEBUG
         //TODO remove type and just use typeSize + signed bool or an enum?
@@ -133,6 +165,17 @@ namespace Vectors
             pVector128Binary32Values = default;
             pVector128Binary64Values = default;
 
+            pVector256UInt8Values = default;
+            pVector256Int8Values = default;
+            pVector256UInt16Values = default;
+            pVector256Int16Values = default;
+            pVector256UInt32Values = default;
+            pVector256Int32Values = default;
+            pVector256UInt64Values = default;
+            pVector256Int64Values = default;
+            pVector256Binary32Values = default;
+            pVector256Binary64Values = default;
+
             byte[] bytes = new byte[count << bitShiftTypeSize];
             pUInt8Values = (byte*)Unsafe.As<byte[], IntPtr>(ref bytes).ToPointer();
 
@@ -142,7 +185,7 @@ namespace Vectors
             //Used in RegisterDebugView to make appropriately sized arrays for each type 
             ElementSize = typeSize / 8;
 
-            //ElementType and ElementTypeLength is used in DebugToString which needs to know the correct type
+            //ElementType and ElementTypeLength are used in DebugToString which needs to know the correct type
             //Can't store Type, String or byte[] with FieldOffset so using byte*
 #nullable enable
             string? typeFullName = type.FullName;
@@ -435,11 +478,37 @@ namespace Vectors
             Constant ? pVector128Binary64Values[0] : pVector128Binary64Values[index];
 
 
-        //TODO Add Vector256<alltypes> unioned fields
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal Vector256<T> ToVector256<T>(int index) where T : struct => Constant
-            ? Unsafe.As<ulong, Vector256<T>>(ref pUInt64Values[0])
-            : Unsafe.As<ulong, Vector256<T>>(ref pUInt64Values[index << 2]);
+        internal Vector256<byte> GetVector256Byte(int index) =>
+            Constant ? pVector256UInt8Values[0] : pVector256UInt8Values[index];
+
+        internal Vector256<sbyte> GetVector256SByte(int index) =>
+            Constant ? pVector256Int8Values[0] : pVector256Int8Values[index];
+
+        internal Vector256<ushort> GetVector256UShort(int index) =>
+            Constant ? pVector256UInt16Values[0] : pVector256UInt16Values[index];
+
+        internal Vector256<short> GetVector256Short(int index) =>
+            Constant ? pVector256Int16Values[0] : pVector256Int16Values[index];
+
+        internal Vector256<uint> GetVector256UInt(int index) =>
+            Constant ? pVector256UInt32Values[0] : pVector256UInt32Values[index];
+
+        internal Vector256<int> GetVector256Int(int index) =>
+            Constant ? pVector256Int32Values[0] : pVector256Int32Values[index];
+
+        internal Vector256<ulong> GetVector256ULong(int index) =>
+            Constant ? pVector256UInt64Values[0] : pVector256UInt64Values[index];
+
+        internal Vector256<long> GetVector256Long(int index) =>
+            Constant ? pVector256Int64Values[0] : pVector256Int64Values[index];
+
+        internal Vector256<float> GetVector256Float(int index) =>
+            Constant ? pVector256Binary32Values[0] : pVector256Binary32Values[index];
+
+        internal Vector256<double> GetVector256Double(int index) =>
+            Constant ? pVector256Binary64Values[0] : pVector256Binary64Values[index];
+
+
 
         //Closest thing possible to a generic indexer when Register cannot be generic,
         //the requirement to use Unsafe is not ideal
