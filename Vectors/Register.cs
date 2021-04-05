@@ -449,6 +449,26 @@ namespace Vectors
             }
         }
 
+        internal byte this[int index, byte uint8] => Constant ? pUInt8Values[0] : pUInt8Values[index];
+
+        internal sbyte this[int index, sbyte int8] => Constant ? pInt8Values[0] : pInt8Values[index];
+
+        internal ushort this[int index, ushort uint16] => Constant ? pUInt16Values[0] : pUInt16Values[index];
+
+        internal short this[int index, short int16] => Constant ? pInt16Values[0] : pInt16Values[index];
+
+        internal uint this[int index, uint uint32] => Constant ? pUInt32Values[0] : pUInt32Values[index];
+
+        internal int this[int index, int int32] => Constant ? pInt32Values[0] : pInt32Values[index];
+
+        internal ulong this[int index, ulong uint64] => Constant ? pUInt64Values[0] : pUInt64Values[index];
+
+        internal long this[int index, long int64] => Constant ? pInt64Values[0] : pInt64Values[index];
+
+        internal float this[int index, float binary32] => Constant ? pBinary32Values[0] : pBinary32Values[index];
+
+        internal double this[int index, double binary64] => Constant ? pBinary64Values[0] : pBinary64Values[index];
+
 
         //Provided I understand how AggressiveInlining and typeof work, these bitshift functions should
         //be reduced to a single result and inlined at compile time for every call for a given type
@@ -747,7 +767,8 @@ namespace Vectors
                 {
                     sb.Append(separator);
                     sb.Append(' ');
-                    sb.Append(((IFormattable)methodInfo?.Invoke(this, new object[] { i }))?.ToString("G", CultureInfo.CurrentCulture));
+                    sb.Append(((IFormattable)methodInfo?.Invoke(this, new object[] { i }))?.ToString("G",
+                        CultureInfo.CurrentCulture));
                 }
 
                 sb.Append('>');

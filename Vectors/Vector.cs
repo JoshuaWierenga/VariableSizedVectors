@@ -1,4 +1,4 @@
-﻿//Contains most of Vector<T> from https://github.com/dotnet/runtime/blob/76a50c6/src/libraries/System.Private.CoreLib/src/System/Numerics/Vector_1.cs which is under the MIT License.
+//Contains most of Vector<T> from https://github.com/dotnet/runtime/blob/76a50c6/src/libraries/System.Private.CoreLib/src/System/Numerics/Vector_1.cs which is under the MIT License.
 
 using System;
 using System.Diagnostics.CodeAnalysis;
@@ -888,7 +888,7 @@ namespace Vectors
 
                         for (int i = 0, j = 16; i < upperValues.Length; i++, j++)
                         {
-                            upperValues[i] = (byte)(left._vector.GetValue<byte>(j) + right._vector.GetValue<byte>(j));
+                            upperValues[i] = (byte)(left._vector[j, uint8: 0] + right._vector[j, uint8: 0]);
                         }
 
                         return Create(count, lower128, upperValues);
@@ -903,7 +903,7 @@ namespace Vectors
                         //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
-                        return Create((byte)(left._vector.GetValue<byte>(0) + right._vector.GetValue<byte>(0)));
+                        return Create((byte)(left._vector[0, uint8: 0] + right._vector[0, uint8: 0]));
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
                         if (!IntrinsicSupport.IsSse2Supported)
@@ -912,7 +912,7 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++)
                             {
-                                values[i] = (byte)(left._vector.GetValue<byte>(i) + right._vector.GetValue<byte>(i));
+                                values[i] = (byte)(left._vector[i, uint8: 0] + right._vector[i, uint8: 0]);
                             }
 
                             return Create(values);
@@ -960,8 +960,8 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++, processedSubOperations++)
                             {
-                                values[i] = (byte)(left._vector.GetValue<byte>(processedSubOperations) +
-                                                    right._vector.GetValue<byte>(processedSubOperations));
+                                values[i] = (byte)(left._vector[processedSubOperations, uint8: 0] +
+                                                    right._vector[processedSubOperations, uint8: 0]);
                             }
 
                             return Create(count, blocks256, blocks128, values);
@@ -969,8 +969,8 @@ namespace Vectors
                         else if (remainingSubOperations == 1)
                         {
                             return Create(count, blocks256, blocks128,
-                                (byte)(left._vector.GetValue<byte>(processedSubOperations) +
-                                        right._vector.GetValue<byte>(processedSubOperations)));
+                                (byte)(left._vector[processedSubOperations, uint8: 0] +
+                                        right._vector[processedSubOperations, uint8: 0]));
                         }
 
                         return Create(count, blocks256, blocks128, value: null);
@@ -991,8 +991,7 @@ namespace Vectors
 
                         for (int i = 0, j = 16; i < upperValues.Length; i++, j++)
                         {
-                            upperValues[i] =
-                                (sbyte)(left._vector.GetValue<sbyte>(j) + right._vector.GetValue<sbyte>(j));
+                            upperValues[i] = (sbyte)(left._vector[j, int8: 0] + right._vector[j, int8: 0]);
                         }
 
                         return Create(count, lower128, upperValues);
@@ -1007,7 +1006,7 @@ namespace Vectors
                         //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
-                        return Create((sbyte)(left._vector.GetValue<sbyte>(0) + right._vector.GetValue<sbyte>(0)));
+                        return Create((sbyte)(left._vector[0, int8: 0] + right._vector[0, int8: 0]));
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
                         if (!IntrinsicSupport.IsSse2Supported)
@@ -1016,8 +1015,7 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++)
                             {
-                                values[i] = (sbyte)(left._vector.GetValue<sbyte>(i) +
-                                                     right._vector.GetValue<sbyte>(i));
+                                values[i] = (sbyte)(left._vector[i, int8: 0] + right._vector[i, int8: 0]);
                             }
 
                             return Create(values);
@@ -1065,8 +1063,8 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++, processedSubOperations++)
                             {
-                                values[i] = (sbyte)(left._vector.GetValue<sbyte>(processedSubOperations) +
-                                                       right._vector.GetValue<sbyte>(processedSubOperations));
+                                values[i] = (sbyte)(left._vector[processedSubOperations, int8: 0] +
+                                                     right._vector[processedSubOperations, int8: 0]);
                             }
 
                             return Create(count, blocks256, blocks128, values);
@@ -1074,8 +1072,8 @@ namespace Vectors
                         else if (remainingSubOperations == 1)
                         {
                             return Create(count, blocks256, blocks128,
-                                (sbyte)(left._vector.GetValue<sbyte>(processedSubOperations) +
-                                         right._vector.GetValue<sbyte>(processedSubOperations)));
+                                (sbyte)(left._vector[processedSubOperations, int8: 0] +
+                                         right._vector[processedSubOperations, int8: 0]));
                         }
 
                         return Create(count, blocks256, blocks128, value: null);
@@ -1096,8 +1094,7 @@ namespace Vectors
 
                         for (int i = 0, j = 8; i < upperValues.Length; i++, j++)
                         {
-                            upperValues[i] =
-                                (ushort)(left._vector.GetValue<ushort>(j) + right._vector.GetValue<ushort>(j));
+                            upperValues[i] = (ushort)(left._vector[j, uint16: 0] + right._vector[j, uint16: 0]);
                         }
 
                         return Create(count, lower128, upperValues);
@@ -1112,7 +1109,7 @@ namespace Vectors
                         //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
-                        return Create((ushort)(left._vector.GetValue<ushort>(0) + right._vector.GetValue<ushort>(0)));
+                        return Create((ushort)(left._vector[0, uint16: 0] + right._vector[0, uint16: 0]));
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
                         if (!IntrinsicSupport.IsSse2Supported)
@@ -1121,8 +1118,7 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++)
                             {
-                                values[i] = (ushort)(left._vector.GetValue<ushort>(i) +
-                                                      right._vector.GetValue<ushort>(i));
+                                values[i] = (ushort)(left._vector[i, uint16: 0] + right._vector[i, uint16: 0]);
                             }
 
                             return Create(values);
@@ -1170,8 +1166,8 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++, processedSubOperations++)
                             {
-                                values[i] = (ushort)(left._vector.GetValue<ushort>(processedSubOperations) +
-                                                        right._vector.GetValue<short>(processedSubOperations));
+                                values[i] = (ushort)(left._vector[processedSubOperations, uint16: 0] +
+                                                        right._vector[processedSubOperations, uint16: 0]);
                             }
 
                             return Create(count, blocks256, blocks128, values);
@@ -1179,8 +1175,8 @@ namespace Vectors
                         else if (remainingSubOperations == 1)
                         {
                             return Create(count, blocks256, blocks128,
-                                (ushort)(left._vector.GetValue<ushort>(processedSubOperations) +
-                                         right._vector.GetValue<ushort>(processedSubOperations)));
+                                (ushort)(left._vector[processedSubOperations, uint16: 0] +
+                                         right._vector[processedSubOperations, uint16: 0]));
                         }
 
                         return Create(count, blocks256, blocks128, value: null);
@@ -1201,7 +1197,7 @@ namespace Vectors
 
                         for (int i = 0, j = 8; i < upperValues.Length; i++, j++)
                         {
-                            upperValues[i] = (short)(left._vector.GetValue<short>(j) + right._vector.GetValue<short>(j));
+                            upperValues[i] = (short)(left._vector[j, int16: 0] + right._vector[j, int16: 0]);
                         }
 
                         return Create(count, lower128, upperValues);
@@ -1216,7 +1212,7 @@ namespace Vectors
                         //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
-                        return Create((short)(left._vector.GetValue<short>(0) + right._vector.GetValue<short>(0)));
+                        return Create((short)(left._vector[0, int16: 0] + right._vector[0, int16: 0]));
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
                         if (!IntrinsicSupport.IsSse2Supported)
@@ -1225,8 +1221,7 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++)
                             {
-                                values[i] = (short)(left._vector.GetValue<short>(i) +
-                                                     right._vector.GetValue<short>(i));
+                                values[i] = (short)(left._vector[i, int16: 0] + right._vector[i, int16: 0]);
                             }
 
                             return Create(values);
@@ -1274,8 +1269,8 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++, processedSubOperations++)
                             {
-                                values[i] = (short)(left._vector.GetValue<short>(processedSubOperations) +
-                                                       right._vector.GetValue<short>(processedSubOperations));
+                                values[i] = (short)(left._vector[processedSubOperations, int16: 0] +
+                                                       right._vector[processedSubOperations, int16: 0]);
                             }
 
                             return Create(count, blocks256, blocks128, values);
@@ -1283,8 +1278,8 @@ namespace Vectors
                         else if (remainingSubOperations == 1)
                         {
                             return Create(count, blocks256, blocks128,
-                                (short)(left._vector.GetValue<short>(processedSubOperations) +
-                                         right._vector.GetValue<short>(processedSubOperations)));
+                                (short)(left._vector[processedSubOperations, int16: 0] +
+                                         right._vector[processedSubOperations, int16: 0]));
                         }
                         //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
                         return Create(count, blocks256, blocks128, value: null);
@@ -1305,7 +1300,7 @@ namespace Vectors
 
                         for (int i = 0, j = 4; i < upperValues.Length; i++, j++)
                         {
-                            upperValues[i] = left._vector.GetValue<uint>(j) + right._vector.GetValue<uint>(j);
+                            upperValues[i] = left._vector[j, uint32: 0] + right._vector[j, uint32: 0];
                         }
 
                         return Create(count, lower128, upperValues);
@@ -1320,7 +1315,7 @@ namespace Vectors
                         //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
-                        return Create(left._vector.GetValue<uint>(0) + right._vector.GetValue<uint>(0));
+                        return Create(left._vector[0, uint32: 0] + right._vector[0, uint32: 0]);
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
                         if (!IntrinsicSupport.IsSse2Supported)
@@ -1329,7 +1324,7 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++)
                             {
-                                values[i] = left._vector.GetValue<uint>(i) + right._vector.GetValue<uint>(i);
+                                values[i] = left._vector[i, uint32: 0] + right._vector[i, uint32: 0];
                             }
 
                             return Create(values);
@@ -1377,8 +1372,8 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++, processedSubOperations++)
                             {
-                                values[i] = left._vector.GetValue<uint>(processedSubOperations) +
-                                              right._vector.GetValue<uint>(processedSubOperations);
+                                values[i] = left._vector[processedSubOperations, uint32: 0] +
+                                              right._vector[processedSubOperations, uint32: 0];
                             }
 
                             return Create(count, blocks256, blocks128, values);
@@ -1386,8 +1381,8 @@ namespace Vectors
                         else if (remainingSubOperations == 1)
                         {
                             return Create(count, blocks256, blocks128,
-                                left._vector.GetValue<uint>(processedSubOperations) +
-                                right._vector.GetValue<uint>(processedSubOperations));
+                                left._vector[processedSubOperations, uint32: 0] +
+                                right._vector[processedSubOperations, uint32: 0]);
                         }
 
                         return Create(count, blocks256, blocks128, value: null);
@@ -1408,7 +1403,7 @@ namespace Vectors
 
                         for (int i = 0, j = 4; i < upperValues.Length; i++, j++)
                         {
-                            upperValues[i] = left._vector.GetValue<int>(j) + right._vector.GetValue<int>(j);
+                            upperValues[i] = left._vector[j, int32: 0] + right._vector[j, int32: 0];
                         }
 
                         return Create(count, lower128, upperValues);
@@ -1423,7 +1418,7 @@ namespace Vectors
                         //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
-                        return Create((int)(object)left._vector.GetValue<T>(0) + (int)(object)right._vector.GetValue<T>(0));
+                        return Create(left._vector[0, int32: 0] + right._vector[0, int32: 0]);
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
                         if (!IntrinsicSupport.IsSse2Supported)
@@ -1432,7 +1427,7 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++)
                             {
-                                values[i] = left._vector.GetValue<int>(i) + right._vector.GetValue<int>(i);
+                                values[i] = left._vector[i, int32: 0] + right._vector[i, int32: 0];
                             }
 
                             return Create(values);
@@ -1480,8 +1475,8 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++, processedSubOperations++)
                             {
-                                values[i] = left._vector.GetValue<int>(processedSubOperations) +
-                                              right._vector.GetValue<int>(processedSubOperations);
+                                values[i] = left._vector[processedSubOperations, int32: 0] +
+                                              right._vector[processedSubOperations, int32: 0];
                             }
 
                             return Create(count, blocks256, blocks128, values);
@@ -1489,8 +1484,8 @@ namespace Vectors
                         else if (remainingSubOperations == 1)
                         {
                             return Create(count, blocks256, blocks128,
-                                left._vector.GetValue<int>(processedSubOperations) +
-                                right._vector.GetValue<int>(processedSubOperations));
+                                left._vector[processedSubOperations, int32: 0] +
+                                right._vector[processedSubOperations, int32: 0]);
                         }
 
                         return Create(count, blocks256, blocks128, value: null);
@@ -1507,7 +1502,7 @@ namespace Vectors
                         Vector128<ulong> lower128 = Sse2.Add(left._vector.ToVector128<ulong>(0),
                             right._vector.ToVector128<ulong>(0));
 
-                        ulong upperValue = left._vector.GetValue<ulong>(3) + right._vector.GetValue<ulong>(3);
+                        ulong upperValue = left._vector[3, uint64: 0] + right._vector[3, uint64: 0];
 
                         return Create(count, lower128, upperValue);
                     case 2 when IntrinsicSupport.IsSse2Supported:
@@ -1517,7 +1512,7 @@ namespace Vectors
                         //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
-                        return Create(left._vector.GetValue<ulong>(0) + right._vector.GetValue<ulong>(0));
+                        return Create(left._vector[0, uint64: 0] + right._vector[0, uint64: 0]);
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
                         if (!IntrinsicSupport.IsSse2Supported)
@@ -1526,7 +1521,7 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++)
                             {
-                                values[i] = left._vector.GetValue<ulong>(i) + right._vector.GetValue<ulong>(i);
+                                values[i] = left._vector[i, uint64: 0] + right._vector[i, uint64: 0];
                             }
 
                             return Create(values);
@@ -1571,8 +1566,8 @@ namespace Vectors
                         if (remainingSubOperations == 1)
                         {
                             return Create(count, blocks256, blocks128,
-                                left._vector.GetValue<ulong>(processedSubOperations) +
-                                right._vector.GetValue<ulong>(processedSubOperations));
+                                left._vector[processedSubOperations, uint64: 0] +
+                                right._vector[processedSubOperations, uint64: 0]);
                         }
 
                         return Create(count, blocks256, blocks128, value: null);
@@ -1589,7 +1584,7 @@ namespace Vectors
                         Vector128<long> lower128 = Sse2.Add(left._vector.ToVector128<long>(0),
                             right._vector.ToVector128<long>(0));
 
-                        long upperValue = left._vector.GetValue<long>(3) + right._vector.GetValue<long>(3);
+                        long upperValue = left._vector[3, int64: 0] + right._vector[3, int64: 0];
 
                         return Create(count, lower128, upperValue);
                     case 2 when IntrinsicSupport.IsSse2Supported:
@@ -1599,7 +1594,7 @@ namespace Vectors
                         //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
-                        return Create(left._vector.GetValue<long>(0) + right._vector.GetValue<long>(0));
+                        return Create(left._vector[0, int64: 0] + right._vector[0, int64: 0]);
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
                         if (!IntrinsicSupport.IsSse2Supported)
@@ -1608,7 +1603,7 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++)
                             {
-                                values[i] = left._vector.GetValue<long>(i) + right._vector.GetValue<long>(i);
+                                values[i] = left._vector[i, int64: 0] + right._vector[i, int64: 0];
                             }
 
                             return Create(values);
@@ -1653,8 +1648,8 @@ namespace Vectors
                         if (remainingSubOperations == 1)
                         {
                             return Create(count, blocks256, blocks128,
-                                left._vector.GetValue<long>(processedSubOperations) +
-                                right._vector.GetValue<long>(processedSubOperations));
+                                left._vector[processedSubOperations, int64: 0] +
+                                right._vector[processedSubOperations, int64: 0]);
                         }
 
                         return Create(count, blocks256, blocks128, value: null);
@@ -1675,7 +1670,7 @@ namespace Vectors
 
                         for (int i = 0, j = 4; i < upperValues.Length; i++, j++)
                         {
-                            upperValues[i] = left._vector.GetValue<float>(j) + right._vector.GetValue<float>(j);
+                            upperValues[i] = left._vector[j, binary32: 0] + right._vector[j, binary32: 0];
                         }
 
                         return Create(count, lower128, upperValues);
@@ -1690,7 +1685,7 @@ namespace Vectors
                         //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
-                        return Create(left._vector.GetValue<float>(0) + right._vector.GetValue<float>(0));
+                        return Create(left._vector[0, binary32: 0] + right._vector[0, binary32: 0]);
                     default:
                         //Assumption is made that no Sse support means no Avx support
                         if (!IntrinsicSupport.IsSseSupported)
@@ -1699,7 +1694,7 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++)
                             {
-                                values[i] = left._vector.GetValue<float>(i) + right._vector.GetValue<float>(i);
+                                values[i] = left._vector[i, binary32: 0] + right._vector[i, binary32: 0];
                             }
 
                             return Create(values);
@@ -1747,8 +1742,8 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++, processedSubOperations++)
                             {
-                                values[i] = left._vector.GetValue<float>(processedSubOperations) +
-                                              right._vector.GetValue<float>(processedSubOperations);
+                                values[i] = left._vector[processedSubOperations, binary32: 0] +
+                                              right._vector[processedSubOperations, binary32: 0];
                             }
 
                             return Create(count, blocks256, blocks128, values);
@@ -1756,8 +1751,8 @@ namespace Vectors
                         else if (remainingSubOperations == 1)
                         {
                             return Create(count, blocks256, blocks128,
-                                left._vector.GetValue<float>(processedSubOperations) +
-                                right._vector.GetValue<float>(processedSubOperations));
+                                left._vector[processedSubOperations, binary32: 0] +
+                                right._vector[processedSubOperations, binary32: 0]);
                         }
 
                         return Create(count, blocks256, blocks128, value: null);
@@ -1774,7 +1769,7 @@ namespace Vectors
                         Vector128<double> lower128 = Sse2.Add(left._vector.ToVector128<double>(0),
                             right._vector.ToVector128<double>(0));
 
-                        double upperValue = left._vector.GetValue<double>(3) + right._vector.GetValue<double>(3);
+                        double upperValue = left._vector[3, binary64: 0] + right._vector[3, binary64: 0];
 
                         return Create(count, lower128, upperValue);
                     case 2 when IntrinsicSupport.IsSse2Supported:
@@ -1784,7 +1779,7 @@ namespace Vectors
                         //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
                         //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
                         //function for each type.
-                        return Create(left._vector.GetValue<double>(0) + right._vector.GetValue<double>(0));
+                        return Create(left._vector[0, binary64: 0] + right._vector[0, binary64: 0]);
                     default:
                         //Assumption is made that no Sse2 support means no Avx support
                         if (!IntrinsicSupport.IsSse2Supported)
@@ -1793,7 +1788,7 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++)
                             {
-                                values[i] = left._vector.GetValue<double>(i) + right._vector.GetValue<double>(i);
+                                values[i] = left._vector[i, binary64: 0] + right._vector[i, binary64: 0];
                             }
 
                             return Create(values);
@@ -1838,8 +1833,8 @@ namespace Vectors
                         if (remainingSubOperations == 1)
                         {
                             return Create(count, blocks256, blocks128,
-                                left._vector.GetValue<double>(processedSubOperations) +
-                                right._vector.GetValue<double>(processedSubOperations));
+                                left._vector[processedSubOperations, binary64: 0] +
+                                right._vector[processedSubOperations, binary64: 0]);
                         }
 
                         return Create(count, blocks256, blocks128, value: null);
