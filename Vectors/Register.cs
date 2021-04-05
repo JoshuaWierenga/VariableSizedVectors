@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -228,6 +228,7 @@ namespace Vectors
             return register;
         }
 
+        //TODO remove SizeOf<T>() and BitShiftHelpers.SizeOf<T>() and just ask caller for size of type?
         //Creates a new Register that holds the given value of type T
         internal static Register Create<T>(T value) where T : struct
         {
@@ -253,6 +254,40 @@ namespace Vectors
                  values.Length, BitShiftHelpers.SizeOf<T>());
 
             Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[0], ref Unsafe.As<T, byte>(ref values[0]),
+                (uint)(values.Length << BitShiftHelpers.SizeOf<T>()));
+
+            return register;
+        }
+
+
+        //TODO remove SizeOf<T>() and BitShiftHelpers.SizeOf<T>() and just ask caller for size of type?
+        //Creates a new Register that holds the given values of type T
+        internal static Register Create<T>(ReadOnlySpan<byte> values)
+        {
+            Register register = new(
+#if DEBUG
+                typeof(T), SizeOf<T>(),
+#endif
+                values.Length >> BitShiftHelpers.SizeOf<T>(), BitShiftHelpers.SizeOf<T>());
+
+            Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[0], ref MemoryMarshal.GetReference(values),
+                (uint) (values.Length << BitShiftHelpers.SizeOf<T>()));
+
+            return register;
+        }
+
+        //TODO remove SizeOf<T>() and BitShiftHelpers.SizeOf<T>() and just ask caller for size of type?
+        //Creates a new Register that holds the given values of type T
+        internal static Register Create<T>(ReadOnlySpan<T> values)
+        {
+            Register register = new(
+#if DEBUG
+                typeof(T), SizeOf<T>(),
+#endif
+                values.Length, BitShiftHelpers.SizeOf<T>());
+
+            Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[0],
+                ref Unsafe.As<T, byte>(ref MemoryMarshal.GetReference(values)),
                 (uint)(values.Length << BitShiftHelpers.SizeOf<T>()));
 
             return register;
@@ -891,6 +926,5 @@ namespace Vectors
 #endif
             }
         }
-
     }
 }

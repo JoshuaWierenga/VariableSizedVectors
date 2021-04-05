@@ -17,25 +17,22 @@ namespace Vectors
     //since the smaller type has to be extended to handle the bigger type, small+big=big is a given though to avoid unneeded overflow
     //TODO Add Vector.Create shorthand that gives specific vector types automatically for general type inputs
     //TODO Retest copy methods
-    public readonly struct Vector<T> : IEquatable<Vector<T>>, IFormattable
-        where T : struct
+    public readonly struct Vector<T> : IEquatable<Vector<T>>, IFormattable where T : struct
     {
         private readonly Register _vector;
 
         public readonly int Length => _vector.Length;
 
-        //TODO Fix, need different constant for each type
-        //public static VectorDouble<T> Zero { get; } = new(0, true);
 
-        //TODO Fix
+        public static Vector<T> Zero { get; } = new(Register.CreateConstant<T>(default));
+
+        //TODO Fix, need different constant for each type
         //public static VectorDouble<T> One { get; } = new(1, true);
 
         //TODO This needs a new way to get all 1's
         //internal static VectorDouble<T> AllBitsSet { get; } = new(BitConverter.Int64BitsToDouble(-1), true);
 
         private Vector(Register register) => _vector = register;
-
-        private Vector(T value, bool allSizes) => _vector = Register.CreateConstant(value);
 
         public Vector(T value) => _vector = Register.Create(value);
 
@@ -58,11 +55,10 @@ namespace Vectors
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Vector(ReadOnlySpan<byte> values) =>
-            _vector = Register.Create(MemoryMarshal.Cast<byte, T>(values).ToArray());
+        public Vector(ReadOnlySpan<byte> values) => _vector = Register.Create<T>(values);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public Vector(ReadOnlySpan<T> values) => _vector = Register.Create(values.ToArray());
+        public Vector(ReadOnlySpan<T> values) => _vector = Register.Create(values);
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public Vector(Span<T> values) : this((ReadOnlySpan<T>)values) { }
@@ -70,13 +66,12 @@ namespace Vectors
 
         //Used for operations on single value vectors
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Vector<T> Create<U>(U value) where U : struct => new(Unsafe.As<U, T>(ref value));
+        private static Vector<T> Create<U>(U value) where U : struct => new(Register.Create(value));
 
         //Used on systems without x86 vector extensions for all operations and vector sizes
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Vector<T> Create<U>(U[] values) where U : struct => new(Unsafe.As<U[], T[]>(ref values), 0);
+        private static Vector<T> Create<U>(U[] values) where U : struct => new(Register.Create(values));
 
-        //TODO Can U be changed to T now? If so this can become a constructor, check others Create overloads as well
         //Used for x86 Sse(2) optimised operations on 128 bit vectors
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static Vector<T> Create<U>(int count, Vector128<U> values) where U : struct =>
@@ -120,7 +115,7 @@ namespace Vectors
         {
             if ((uint)destination.Length < (uint)(_vector.Length << BitShiftHelpers.SizeOf<T>()))
             {
-                throw new ArgumentException();
+                throw new ArgumentOutOfRangeException(nameof(destination));
             }
 
             unsafe
@@ -134,7 +129,7 @@ namespace Vectors
         {
             if ((uint)destination.Length < (uint)_vector.Length)
             {
-                throw new ArgumentException();
+                throw new ArgumentOutOfRangeException(nameof(destination));
             }
 
             unsafe
@@ -165,8 +160,6 @@ namespace Vectors
 
         public readonly unsafe T this[int index] => _vector.GetValue<T>(index);
 
-        //TODO Ensure this works, if so the following todo is irrelevant
-        //TODO Decide if this should become type specific and just use the right array to avoid casting
         public readonly unsafe Vector<T> Slice(int start, int length) => new(
             new Span<T>(_vector.pUInt8Values, _vector.Length << BitShiftHelpers.SizeOf<T>()).Slice(start, length));
 
@@ -216,21 +209,21 @@ namespace Vectors
                 case 1:
                     break;
                 case 2:
-                    sb.Append(NumberFormatInfo.GetInstance(formatProvider).NumberGroupSeparator);
+                    sb.Append(separator);
                     sb.Append(' ');
                     sb.Append(((IFormattable)_vector.GetValue<T>(1)).ToString(format, formatProvider));
                     break;
                 case 3:
                 case 4:
-                    sb.Append(NumberFormatInfo.GetInstance(formatProvider).NumberGroupSeparator);
+                    sb.Append(separator);
                     sb.Append(' ');
                     sb.Append(((IFormattable)_vector.GetValue<T>(1)).ToString(format, formatProvider));
-                    sb.Append(NumberFormatInfo.GetInstance(formatProvider).NumberGroupSeparator);
+                    sb.Append(separator);
                     sb.Append(' ');
                     sb.Append(((IFormattable)_vector.GetValue<T>(2)).ToString(format, formatProvider));
                     if (_vector.Length == 4)
                     {
-                        sb.Append(NumberFormatInfo.GetInstance(formatProvider).NumberGroupSeparator);
+                        sb.Append(separator);
                         sb.Append(' ');
                         sb.Append(((IFormattable)_vector.GetValue<T>(3)).ToString(format, formatProvider));
                     }
