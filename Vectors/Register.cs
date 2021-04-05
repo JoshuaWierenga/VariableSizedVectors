@@ -19,7 +19,7 @@ namespace Vectors
     [DebuggerDisplay("{" + nameof(DebugToString) + "}")]
     [DebuggerTypeProxy(typeof(RegisterDebugView))]
     [StructLayout(LayoutKind.Explicit)]
-    public readonly unsafe struct Register
+    internal readonly unsafe struct Register
     {
         //TODO Check if it is possible to make constant vectors different in a way that is detectable at compile time
         //Check if them being static helps, I tried to go for compile time constants but that is not possible with structs
@@ -35,54 +35,66 @@ namespace Vectors
         //ReadOnlySpan requires ref on Vector which breaks interfaces.
         //I tried ReadOnlyMemory but it does not have a void* constructor
         //if this could be worked around and performance was good ReadOnlyMemory<T>.Span exists.
-        //TODO Determine if these unioned array fields are useful and if so make them internal
         [FieldOffset(5)]
         internal readonly byte* pUInt8Values;
+
         [FieldOffset(5)]
-#if DEBUG
-        internal
-#endif
-        readonly sbyte* pInt8Values;
+        internal readonly sbyte* pInt8Values;
+
         [FieldOffset(5)]
-#if DEBUG
-        internal
-#endif
-        readonly ushort* pUInt16Values;
+        internal readonly ushort* pUInt16Values;
+
         [FieldOffset(5)]
-#if DEBUG
-        internal
-#endif
-        readonly short* pInt16Values;
+        internal readonly short* pInt16Values;
+
         [FieldOffset(5)]
-#if DEBUG
-        internal
-#endif
-        readonly uint* pUInt32Values;
+        internal readonly uint* pUInt32Values;
+
         [FieldOffset(5)]
-#if DEBUG
-        internal
-#endif
-        readonly int* pInt32Values;
+        internal readonly int* pInt32Values;
+
         [FieldOffset(5)]
-#if DEBUG
-        internal
-#endif
-        readonly ulong* pUInt64Values;
+        internal readonly ulong* pUInt64Values;
+
         [FieldOffset(5)]
-#if DEBUG
-        internal
-#endif
-        readonly long* pInt64Values;
+        internal readonly long* pInt64Values;
+
         [FieldOffset(5)]
-#if DEBUG
-        internal
-#endif
-        readonly float* pBinary32Values;
+        internal readonly float* pBinary32Values;
+
         [FieldOffset(5)]
-#if DEBUG
-        internal
-#endif
-        readonly double* pBinary64Values;
+        internal readonly double* pBinary64Values;
+
+
+        [FieldOffset(5)]
+        internal readonly Vector128<byte>* pVector128UInt8Values;
+
+        [FieldOffset(5)]
+        private readonly Vector128<sbyte>* pVector128Int8Values;
+
+        [FieldOffset(5)]
+        private readonly Vector128<ushort>* pVector128UInt16Values;
+
+        [FieldOffset(5)]
+        private readonly Vector128<short>* pVector128Int16Values;
+
+        [FieldOffset(5)]
+        private readonly Vector128<uint>* pVector128UInt32Values;
+
+        [FieldOffset(5)]
+        private readonly Vector128<int>* pVector128Int32Values;
+
+        [FieldOffset(5)]
+        private readonly Vector128<ulong>* pVector128UInt64Values;
+
+        [FieldOffset(5)]
+        private readonly Vector128<long>* pVector128Int64Values;
+
+        [FieldOffset(5)]
+        private readonly Vector128<float>* pVector128Binary32Values;
+
+        [FieldOffset(5)]
+        private readonly Vector128<double>* pVector128Binary64Values;
 
 #if DEBUG
         [FieldOffset(13)]
@@ -109,6 +121,17 @@ namespace Vectors
             pInt64Values = default;
             pBinary32Values = default;
             pBinary64Values = default;
+
+            pVector128UInt8Values = default;
+            pVector128Int8Values = default;
+            pVector128UInt16Values = default;
+            pVector128Int16Values = default;
+            pVector128UInt32Values = default;
+            pVector128Int32Values = default;
+            pVector128UInt64Values = default;
+            pVector128Int64Values = default;
+            pVector128Binary32Values = default;
+            pVector128Binary64Values = default;
 
             byte[] bytes = new byte[count << bitShiftTypeSize];
             pUInt8Values = (byte*)Unsafe.As<byte[], IntPtr>(ref bytes).ToPointer();
@@ -378,16 +401,39 @@ namespace Vectors
             return register;
         }
 
-        //TODO Add Vector128<alltypes> unioned fields
-        //TODO Decide if this should work as it does now and return adjacent vectors or should they overlap such that
-        //the index has to increase by 2/4 to get an adjacent vector
+
         //TODO Decide if these need bounds checking for non constants. Provided at least some values in the subvector
-        //exists but no all, Unsafe.As will still will return a valid vector but it will contain mostly junk and may
-        //lead to crashes
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal Vector128<T> ToVector128<T>(int index) where T : struct => Constant
-            ? Unsafe.As<ulong, Vector128<T>>(ref pUInt64Values[0])
-            : Unsafe.As<ulong, Vector128<T>>(ref pUInt64Values[index << 1]);
+        //exists but no all, Unsafe.As will still will return a vector but it will contain mostly junk and may lead to crashes
+        internal Vector128<byte> GetVector128Byte(int index) =>
+            Constant ? pVector128UInt8Values[0] : pVector128UInt8Values[index];
+
+        internal Vector128<sbyte> GetVector128SByte(int index) =>
+            Constant ? pVector128Int8Values[0] : pVector128Int8Values[index];
+
+        internal Vector128<ushort> GetVector128UShort(int index) =>
+            Constant ? pVector128UInt16Values[0] : pVector128UInt16Values[index];
+
+        internal Vector128<short> GetVector128Short(int index) =>
+            Constant ? pVector128Int16Values[0] : pVector128Int16Values[index];
+
+        internal Vector128<uint> GetVector128UInt(int index) =>
+            Constant ? pVector128UInt32Values[0] : pVector128UInt32Values[index];
+
+        internal Vector128<int> GetVector128Int(int index) =>
+            Constant ? pVector128Int32Values[0] : pVector128Int32Values[index];
+
+        internal Vector128<ulong> GetVector128ULong(int index) =>
+            Constant ? pVector128UInt64Values[0] : pVector128UInt64Values[index];
+
+        internal Vector128<long> GetVector128Long(int index) =>
+            Constant ? pVector128Int64Values[0] : pVector128Int64Values[index];
+
+        internal Vector128<float> GetVector128Float(int index) =>
+            Constant ? pVector128Binary32Values[0] : pVector128Binary32Values[index];
+
+        internal Vector128<double> GetVector128Double(int index) =>
+            Constant ? pVector128Binary64Values[0] : pVector128Binary64Values[index];
+
 
         //TODO Add Vector256<alltypes> unioned fields
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -396,10 +442,7 @@ namespace Vectors
             : Unsafe.As<ulong, Vector256<T>>(ref pUInt64Values[index << 2]);
 
         //Closest thing possible to a generic indexer when Register cannot be generic,
-        //the requirement to use Unsafe, it not ideal
-        //TODO Remove Unsafe.As casts and use correct arrays for each, this was the entire point of unioning them
-        //Does this require making a different call for each type, most uses are in type specific code so it should
-        //be fine if that is required
+        //the requirement to use Unsafe is not ideal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal T GetValue<T>(int index)
         {
@@ -449,25 +492,26 @@ namespace Vectors
             }
         }
 
-        internal byte this[int index, byte uint8] => Constant ? pUInt8Values[0] : pUInt8Values[index];
 
-        internal sbyte this[int index, sbyte int8] => Constant ? pInt8Values[0] : pInt8Values[index];
+        internal byte GetByte(int index) => Constant ? pUInt8Values[0] : pUInt8Values[index];
 
-        internal ushort this[int index, ushort uint16] => Constant ? pUInt16Values[0] : pUInt16Values[index];
+        internal sbyte GetSByte(int index) => Constant ? pInt8Values[0] : pInt8Values[index];
 
-        internal short this[int index, short int16] => Constant ? pInt16Values[0] : pInt16Values[index];
+        internal ushort GetUShort(int index) => Constant ? pUInt16Values[0] : pUInt16Values[index];
 
-        internal uint this[int index, uint uint32] => Constant ? pUInt32Values[0] : pUInt32Values[index];
+        internal short GetShort(int index) => Constant ? pInt16Values[0] : pInt16Values[index];
 
-        internal int this[int index, int int32] => Constant ? pInt32Values[0] : pInt32Values[index];
+        internal uint GetUint(int index) => Constant ? pUInt32Values[0] : pUInt32Values[index];
 
-        internal ulong this[int index, ulong uint64] => Constant ? pUInt64Values[0] : pUInt64Values[index];
+        internal int GetInt(int index) => Constant ? pInt32Values[0] : pInt32Values[index];
 
-        internal long this[int index, long int64] => Constant ? pInt64Values[0] : pInt64Values[index];
+        internal ulong GetULong(int index) => Constant ? pUInt64Values[0] : pUInt64Values[index];
 
-        internal float this[int index, float binary32] => Constant ? pBinary32Values[0] : pBinary32Values[index];
+        internal long GetLong(int index) => Constant ? pInt64Values[0] : pInt64Values[index];
 
-        internal double this[int index, double binary64] => Constant ? pBinary64Values[0] : pBinary64Values[index];
+        internal float GetFloat(int index) => Constant ? pBinary32Values[0] : pBinary32Values[index];
+
+        internal double GetDouble(int index) => Constant ? pBinary64Values[0] : pBinary64Values[index];
 
 
         //Provided I understand how AggressiveInlining and typeof work, these bitshift functions should
