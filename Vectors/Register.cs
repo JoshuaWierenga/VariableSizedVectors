@@ -403,22 +403,22 @@ namespace Vectors
                 processed = blocks256.Length << BitShiftAmountIn256Bit<T>();
 
                 Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[0],
-                    ref Unsafe.As<Vector256<T>, byte>(ref blocks256[0]), (uint)(processed << 3));
+                    ref Unsafe.As<Vector256<T>, byte>(ref blocks256[0]), (uint)(processed << BitShiftHelpers.SizeOf<T>()));
             }
 
             if (blocks128 != null)
             {
                 int count128 = blocks128.Length << BitShiftAmountIn128Bit<T>();
 
-                Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[processed << 3],
-                    ref Unsafe.As<Vector128<T>, byte>(ref blocks128[0]), (uint)(count128 << 3));
+                Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[processed << BitShiftHelpers.SizeOf<T>()],
+                    ref Unsafe.As<Vector128<T>, byte>(ref blocks128[0]), (uint)(count128 << BitShiftHelpers.SizeOf<T>()));
 
                 processed += count128;
             }
 
             if (value != null)
             {
-                Unsafe.WriteUnaligned(ref register.pUInt8Values[processed << 3], value.Value);
+                Unsafe.WriteUnaligned(ref register.pUInt8Values[processed << BitShiftHelpers.SizeOf<T>()], value.Value);
             }
 
             return register;
@@ -457,22 +457,22 @@ namespace Vectors
                 processed = blocks256.Length << BitShiftAmountIn256Bit<T>();
 
                 Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[0],
-                    ref Unsafe.As<Vector256<T>, byte>(ref blocks256[0]), (uint)(processed << 3));
+                    ref Unsafe.As<Vector256<T>, byte>(ref blocks256[0]), (uint)(processed << BitShiftHelpers.SizeOf<T>()));
             }
 
             if (blocks128 != null)
             {
                 int count128 = blocks128.Length << BitShiftAmountIn128Bit<T>();
 
-                Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[processed << 3],
-                    ref Unsafe.As<Vector128<T>, byte>(ref blocks128[0]), (uint)(count128 << 3));
+                Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[processed << BitShiftHelpers.SizeOf<T>()],
+                    ref Unsafe.As<Vector128<T>, byte>(ref blocks128[0]), (uint)(count128 << BitShiftHelpers.SizeOf<T>()));
 
                 processed += count128;
             }
 
             if (values != null)
             {
-                Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[processed << 3],
+                Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[processed << BitShiftHelpers.SizeOf<T>()],
                     ref Unsafe.As<T, byte>(ref values[0]), (uint)(values.Length << BitShiftHelpers.SizeOf<T>()));
             }
 
@@ -488,7 +488,7 @@ namespace Vectors
 
         internal short GetShort(int index) => Constant ? pInt16Values[0] : pInt16Values[index];
 
-        internal uint GetUint(int index) => Constant ? pUInt32Values[0] : pUInt32Values[index];
+        internal uint GetUInt(int index) => Constant ? pUInt32Values[0] : pUInt32Values[index];
 
         internal int GetInt(int index) => Constant ? pInt32Values[0] : pInt32Values[index];
 
@@ -948,7 +948,7 @@ namespace Vectors
                 }
 
                 MethodInfo methodInfo = typeof(Register)
-                    .GetMethod("GetValue", BindingFlags.Instance | BindingFlags.NonPublic)
+                    .GetMethod("GetValueUnsafe", BindingFlags.Instance | BindingFlags.NonPublic)
                     ?.MakeGenericMethod(storedType);
 
                 StringBuilder sb = new();

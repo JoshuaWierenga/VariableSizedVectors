@@ -707,8 +707,8 @@ namespace Vectors
         }
 
         //TODO Fix constants
-        /*[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        public static Vector<T> operator -(Vector<T> value) => Zero - value;*/
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Vector<T> operator -(Vector<T> value) => Zero - value;
 
         //TODO Add bitwise operations when integer types are supported
 
@@ -852,7 +852,7 @@ namespace Vectors
         //TODO Ensure constants are set correctly, is it worth making the constant for each type a variable in each if case?
         //There are functions in Register<T> to calculate them but that feels unnecessary since those are for generic cases
         //TODO Is it worth unrolling 16 though 120 bit operations(i.e. 2-15 (s)bytes, 2-7 (u)shorts and 2-3 (u)ints/floats)?
-        //TODO Optimise arbitrary length remainder(<128bit) and 136 to 248bit code since the maximum size is fixed and so can be unrolled, 
+        //TODO Optimise arbitrary length remainder(<128bit) code since the maximum size is fixed and so can be unrolled, 
         //more so for 32 bit and perhaps 16 bit numbers
         //This method performs addition on the vectors left and right.
         //If x86 vector extensions are supported then this method first handles the conversion of Vector<T>s to some
@@ -879,10 +879,52 @@ namespace Vectors
                             right._vector.GetVector128Byte(0));
 
                         byte[] upperValues = new byte[count - 16];
+                        int remaining = upperValues.Length;
+                        int position = 0;
+                        int arrayPosition = 16;
 
-                        for (int i = 0, j = 16; i < upperValues.Length; i++, j++)
+                        //TODO Figure out if this is any faster than the for loop that was here
+                        if (remaining >= 8)
                         {
-                            upperValues[i] = (byte)(left._vector.GetByte(j) + right._vector.GetByte(j));
+                            upperValues[0] = (byte)(left._vector.GetByte(16) + right._vector.GetByte(16));
+                            upperValues[1] = (byte)(left._vector.GetByte(17) + right._vector.GetByte(17));
+                            upperValues[2] = (byte)(left._vector.GetByte(18) + right._vector.GetByte(18));
+                            upperValues[3] = (byte)(left._vector.GetByte(19) + right._vector.GetByte(19));
+                            upperValues[4] = (byte)(left._vector.GetByte(20) + right._vector.GetByte(20));
+                            upperValues[5] = (byte)(left._vector.GetByte(21) + right._vector.GetByte(21));
+                            upperValues[6] = (byte)(left._vector.GetByte(22) + right._vector.GetByte(22));
+                            upperValues[8] = (byte)(left._vector.GetByte(23) + right._vector.GetByte(23));
+                            position = 8;
+                            remaining -= 8;
+                            arrayPosition = 24;
+                        }
+
+                        if (remaining >= 4)
+                        {
+                            upperValues[position++] = (byte)(left._vector.GetByte(arrayPosition) +
+                                                              right._vector.GetByte(arrayPosition++));
+                            upperValues[position++] = (byte)(left._vector.GetByte(arrayPosition) +
+                                                              right._vector.GetByte(arrayPosition++));
+                            upperValues[position++] = (byte)(left._vector.GetByte(arrayPosition) +
+                                                              right._vector.GetByte(arrayPosition++));
+                            upperValues[position++] = (byte)(left._vector.GetByte(arrayPosition) +
+                                                              right._vector.GetByte(arrayPosition++));
+                            remaining -= 4;
+                        }
+
+                        if (remaining >= 2)
+                        {
+                            upperValues[position++] = (byte)(left._vector.GetByte(arrayPosition) +
+                                                              right._vector.GetByte(arrayPosition++));
+                            upperValues[position++] = (byte)(left._vector.GetByte(arrayPosition) +
+                                                              right._vector.GetByte(arrayPosition++));
+                            remaining -= 2;
+                        }
+
+                        if (remaining == 1)
+                        {
+                            upperValues[position] = (byte)(left._vector.GetByte(arrayPosition) +
+                                                            right._vector.GetByte(arrayPosition));
                         }
 
                         return Create(count, lower128, upperValues);
@@ -979,10 +1021,52 @@ namespace Vectors
                             right._vector.GetVector128SByte(0));
 
                         sbyte[] upperValues = new sbyte[count - 16];
+                        int remaining = upperValues.Length;
+                        int position = 0;
+                        int arrayPosition = 16;
 
-                        for (int i = 0, j = 16; i < upperValues.Length; i++, j++)
+                        //TODO Figure out if this is any faster than the for loop that was here
+                        if (remaining >= 8)
                         {
-                            upperValues[i] = (sbyte)(left._vector.GetSByte(j) + right._vector.GetSByte(j));
+                            upperValues[0] = (sbyte)(left._vector.GetSByte(16) + right._vector.GetSByte(16));
+                            upperValues[1] = (sbyte)(left._vector.GetSByte(17) + right._vector.GetSByte(17));
+                            upperValues[2] = (sbyte)(left._vector.GetSByte(18) + right._vector.GetSByte(18));
+                            upperValues[3] = (sbyte)(left._vector.GetSByte(19) + right._vector.GetSByte(19));
+                            upperValues[4] = (sbyte)(left._vector.GetSByte(20) + right._vector.GetSByte(20));
+                            upperValues[5] = (sbyte)(left._vector.GetSByte(21) + right._vector.GetSByte(21));
+                            upperValues[6] = (sbyte)(left._vector.GetSByte(22) + right._vector.GetSByte(22));
+                            upperValues[8] = (sbyte)(left._vector.GetSByte(23) + right._vector.GetSByte(23));
+                            position = 8;
+                            remaining -= 8;
+                            arrayPosition = 24;
+                        }
+
+                        if (remaining >= 4)
+                        {
+                            upperValues[position++] = (sbyte)(left._vector.GetSByte(arrayPosition) +
+                                                              right._vector.GetSByte(arrayPosition++));
+                            upperValues[position++] = (sbyte)(left._vector.GetSByte(arrayPosition) +
+                                                              right._vector.GetSByte(arrayPosition++));
+                            upperValues[position++] = (sbyte)(left._vector.GetSByte(arrayPosition) +
+                                                              right._vector.GetSByte(arrayPosition++));
+                            upperValues[position++] = (sbyte)(left._vector.GetSByte(arrayPosition) +
+                                                              right._vector.GetSByte(arrayPosition++));
+                            remaining -= 4;
+                        }
+
+                        if (remaining >= 2)
+                        {
+                            upperValues[position++] = (sbyte)(left._vector.GetSByte(arrayPosition) +
+                                                              right._vector.GetSByte(arrayPosition++));
+                            upperValues[position++] = (sbyte)(left._vector.GetSByte(arrayPosition) +
+                                                              right._vector.GetSByte(arrayPosition++));
+                            remaining -= 2;
+                        }
+
+                        if (remaining == 1)
+                        {
+                            upperValues[position] = (sbyte)(left._vector.GetSByte(arrayPosition) +
+                                                            right._vector.GetSByte(arrayPosition));
                         }
 
                         return Create(count, lower128, upperValues);
@@ -1079,10 +1163,35 @@ namespace Vectors
                             right._vector.GetVector128UShort(0));
 
                         ushort[] upperValues = new ushort[count - 8];
+                        int remaining = upperValues.Length;
+                        int position = 0;
+                        int arrayPosition = 8;
 
-                        for (int i = 0, j = 8; i < upperValues.Length; i++, j++)
+                        //TODO Figure out if this is any faster than the for loop that was here
+                        if (remaining >= 4)
                         {
-                            upperValues[i] = (ushort)(left._vector.GetUShort(j) + right._vector.GetUShort(j));
+                            upperValues[0] = (ushort)(left._vector.GetUShort(8) + right._vector.GetUShort(8));
+                            upperValues[1] = (ushort)(left._vector.GetUShort(9) + right._vector.GetUShort(9));
+                            upperValues[2] = (ushort)(left._vector.GetUShort(10) + right._vector.GetUShort(10));
+                            upperValues[3] = (ushort)(left._vector.GetUShort(11) + right._vector.GetUShort(11));
+                            position = 4;
+                            remaining -= 4;
+                            arrayPosition = 12;
+                        }
+
+                        if (remaining >= 2)
+                        {
+                            upperValues[position++] = (ushort)(left._vector.GetUShort(arrayPosition) +
+                                                              right._vector.GetUShort(arrayPosition++));
+                            upperValues[position++] = (ushort)(left._vector.GetUShort(arrayPosition) +
+                                                              right._vector.GetUShort(arrayPosition++));
+                            remaining -= 2;
+                        }
+
+                        if (remaining == 1)
+                        {
+                            upperValues[position] = (ushort)(left._vector.GetUShort(arrayPosition) +
+                                                            right._vector.GetUShort(arrayPosition));
                         }
 
                         return Create(count, lower128, upperValues);
@@ -1179,10 +1288,35 @@ namespace Vectors
                             right._vector.GetVector128Short(0));
 
                         short[] upperValues = new short[count - 8];
+                        int remaining = upperValues.Length;
+                        int position = 0;
+                        int arrayPosition = 8;
 
-                        for (int i = 0, j = 8; i < upperValues.Length; i++, j++)
+                        //TODO Figure out if this is any faster than the for loop that was here
+                        if (remaining >= 4)
                         {
-                            upperValues[i] = (short)(left._vector.GetShort(j) + right._vector.GetShort(j));
+                            upperValues[0] = (short)(left._vector.GetShort(8) + right._vector.GetShort(8));
+                            upperValues[1] = (short)(left._vector.GetShort(9) + right._vector.GetShort(9));
+                            upperValues[2] = (short)(left._vector.GetShort(10) + right._vector.GetShort(10));
+                            upperValues[3] = (short)(left._vector.GetShort(11) + right._vector.GetShort(11));
+                            position = 4;
+                            remaining -= 4;
+                            arrayPosition = 12;
+                        }
+
+                        if (remaining >= 2)
+                        {
+                            upperValues[position++] = (short)(left._vector.GetShort(arrayPosition) +
+                                                               right._vector.GetShort(arrayPosition++));
+                            upperValues[position++] = (short)(left._vector.GetShort(arrayPosition) +
+                                                               right._vector.GetShort(arrayPosition++));
+                            remaining -= 2;
+                        }
+
+                        if (remaining == 1)
+                        {
+                            upperValues[position] = (short)(left._vector.GetShort(arrayPosition) +
+                                                             right._vector.GetShort(arrayPosition));
                         }
 
                         return Create(count, lower128, upperValues);
@@ -1278,10 +1412,24 @@ namespace Vectors
                             right._vector.GetVector128UInt(0));
 
                         uint[] upperValues = new uint[count - 4];
+                        int remaining = upperValues.Length;
+                        int position = 0;
+                        int arrayPosition = 4;
 
-                        for (int i = 0, j = 4; i < upperValues.Length; i++, j++)
+                        //TODO Figure out if this is any faster than the for loop that was here
+                        if (remaining >= 2)
                         {
-                            upperValues[i] = left._vector.GetUint(j) + right._vector.GetUint(j);
+                            upperValues[0] = left._vector.GetUInt(8) + right._vector.GetUInt(8);
+                            upperValues[1] = left._vector.GetUInt(9) + right._vector.GetUInt(9);
+                            position = 2;
+                            remaining -= 2;
+                            arrayPosition = 10;
+                        }
+
+                        if (remaining == 1)
+                        {
+                            upperValues[position] = left._vector.GetUInt(arrayPosition) +
+                                                    right._vector.GetUInt(arrayPosition);
                         }
 
                         return Create(count, lower128, upperValues);
@@ -1293,7 +1441,7 @@ namespace Vectors
                     /*case 2 when AdvSimd.IsSupported:
                         break;*/
                     case 1:
-                        return Create(left._vector.GetUint(0) + right._vector.GetUint(0));
+                        return Create(left._vector.GetUInt(0) + right._vector.GetUInt(0));
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
                         if (!IntrinsicSupport.IsSse2Supported)
@@ -1302,7 +1450,7 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++)
                             {
-                                values[i] = left._vector.GetUint(i) + right._vector.GetUint(i);
+                                values[i] = left._vector.GetUInt(i) + right._vector.GetUInt(i);
                             }
 
                             return Create(values);
@@ -1350,8 +1498,8 @@ namespace Vectors
 
                             for (int i = 0; i < values.Length; i++, processedSubOperations++)
                             {
-                                values[i] = left._vector.GetUint(processedSubOperations) +
-                                              right._vector.GetUint(processedSubOperations);
+                                values[i] = left._vector.GetUInt(processedSubOperations) +
+                                              right._vector.GetUInt(processedSubOperations);
                             }
 
                             return Create(count, blocks256, blocks128, values);
@@ -1359,8 +1507,8 @@ namespace Vectors
                         else if (remainingSubOperations == 1)
                         {
                             return Create(count, blocks256, blocks128,
-                                left._vector.GetUint(processedSubOperations) +
-                                right._vector.GetUint(processedSubOperations));
+                                left._vector.GetUInt(processedSubOperations) +
+                                right._vector.GetUInt(processedSubOperations));
                         }
 
                         return Create(count, blocks256, blocks128, value: null);
@@ -1378,10 +1526,24 @@ namespace Vectors
                             right._vector.GetVector128Int(0));
 
                         int[] upperValues = new int[count - 4];
+                        int remaining = upperValues.Length;
+                        int position = 0;
+                        int arrayPosition = 4;
 
-                        for (int i = 0, j = 4; i < upperValues.Length; i++, j++)
+                        //TODO Figure out if this is any faster than the for loop that was here
+                        if (remaining >= 2)
                         {
-                            upperValues[i] = left._vector.GetInt(j) + right._vector.GetInt(j);
+                            upperValues[0] = left._vector.GetInt(8) + right._vector.GetInt(8);
+                            upperValues[1] = left._vector.GetInt(9) + right._vector.GetInt(9);
+                            position = 2;
+                            remaining -= 2;
+                            arrayPosition = 10;
+                        }
+
+                        if (remaining == 1)
+                        {
+                            upperValues[position] =
+                                left._vector.GetInt(arrayPosition) + right._vector.GetInt(arrayPosition);
                         }
 
                         return Create(count, lower128, upperValues);
@@ -1637,9 +1799,24 @@ namespace Vectors
 
                         float[] upperValues = new float[count - 4];
 
-                        for (int i = 0, j = 4; i < upperValues.Length; i++, j++)
+                        int remaining = upperValues.Length;
+                        int position = 0;
+                        int arrayPosition = 4;
+
+                        //TODO Figure out if this is any faster than the for loop that was here
+                        if (remaining >= 2)
                         {
-                            upperValues[i] = left._vector.GetFloat(j) + right._vector.GetFloat(j);
+                            upperValues[0] = left._vector.GetFloat(8) + right._vector.GetFloat(8);
+                            upperValues[1] = left._vector.GetFloat(9) + right._vector.GetFloat(9);
+                            position = 2;
+                            remaining -= 2;
+                            arrayPosition = 10;
+                        }
+
+                        if (remaining == 1)
+                        {
+                            upperValues[position] =
+                                left._vector.GetFloat(arrayPosition) + right._vector.GetFloat(arrayPosition);
                         }
 
                         return Create(count, lower128, upperValues);

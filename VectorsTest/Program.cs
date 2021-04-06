@@ -23,7 +23,7 @@ namespace VectorsTest
             Console.WriteLine($"{firstByte} * {2} = {firstByte * 2}");
             Console.WriteLine($"{6} * {secondByte} = {6 * secondByte}");
             Console.WriteLine($"{firstByte} / {secondByte} = {firstByte / secondByte}");
-            //Console.WriteLine($"-{firstByte} = {-firstByte}");
+            Console.WriteLine($"-{firstByte} = {-firstByte}");
             Console.WriteLine($"{firstByte} == {secondByte} = {firstByte == secondByte}");
             Console.WriteLine($"{firstByte} == {firstByte} = {firstByte == firstByte}");
             Console.WriteLine($"{firstByte} != {secondByte} = {firstByte != secondByte}");
@@ -40,7 +40,7 @@ namespace VectorsTest
             Console.WriteLine($"{firstUlong} * {2} = {firstUlong * 2}");
             Console.WriteLine($"{6} * {secondUlong} = {6 * secondUlong}");
             Console.WriteLine($"{firstUlong} / {secondUlong} = {firstUlong / secondUlong}");
-            //Console.WriteLine($"-{firstUlong} = {-firstUlong}");
+            Console.WriteLine($"-{firstUlong} = {-firstUlong}");
             Console.WriteLine($"{firstUlong} == {secondUlong} = {firstUlong == secondUlong}");
             Console.WriteLine($"{firstUlong} == {firstUlong} = {firstUlong == firstUlong}");
             Console.WriteLine($"{firstUlong} != {secondUlong} = {firstUlong != secondUlong}");
@@ -57,7 +57,7 @@ namespace VectorsTest
             Console.WriteLine($"{firstInt} * {2} = {firstInt * 2}");
             Console.WriteLine($"{6} * {secondInt} = {6 * secondInt}");
             Console.WriteLine($"{firstInt} / {secondInt} = {firstInt / secondInt}");
-            //Console.WriteLine($"-{firstInt} = {-firstInt}");
+            Console.WriteLine($"-{firstInt} = {-firstInt}");
             Console.WriteLine($"{firstInt} == {secondInt} = {firstInt == secondInt}");
             Console.WriteLine($"{firstInt} == {firstInt} = {firstInt == firstInt}");
             Console.WriteLine($"{firstInt} != {secondInt} = {firstInt != secondInt}");
@@ -74,7 +74,7 @@ namespace VectorsTest
             Console.WriteLine($"{firstUShort} * {2} = {firstUShort * 2}");
             Console.WriteLine($"{6} * {secondUShort} = {6 * secondUShort}");
             Console.WriteLine($"{firstUShort} / {secondUShort} = {firstUShort / secondUShort}");
-            //Console.WriteLine($"-{firstUShort} = {-firstUShort}");
+            Console.WriteLine($"-{firstUShort} = {-firstUShort}");
             Console.WriteLine($"{firstUShort} == {secondUShort} = {firstUShort == secondUShort}");
             Console.WriteLine($"{firstUShort} == {firstUShort} = {firstUShort == firstUShort}");
             Console.WriteLine($"{firstUShort} != {secondUShort} = {firstUShort != secondUShort}");
@@ -91,7 +91,7 @@ namespace VectorsTest
             Console.WriteLine($"{firstDouble} * {2} = {firstDouble * 2}");
             Console.WriteLine($"{6} * {secondDouble} = {6 * secondDouble}");
             Console.WriteLine($"{firstDouble} / {secondDouble} = {firstDouble / secondDouble}");
-            //Console.WriteLine($"-{firstDouble} = {-firstDouble}");
+            Console.WriteLine($"-{firstDouble} = {-firstDouble}");
             Console.WriteLine($"{firstDouble} == {secondDouble} = {firstDouble == secondDouble}");
             Console.WriteLine($"{firstDouble} == {firstDouble} = {firstDouble == firstDouble}");
             Console.WriteLine($"{firstDouble} != {secondDouble} = {firstDouble != secondDouble}");
@@ -108,7 +108,7 @@ namespace VectorsTest
             Console.WriteLine($"{firstByte} * {2} = {firstByte * 2}");
             Console.WriteLine($"{6} * {secondByte} = {6 * secondByte}");
             Console.WriteLine($"{firstByte} / {secondByte} = {firstByte / secondByte}");
-            //Console.WriteLine($"-{firstByte} = {-firstByte}");
+            Console.WriteLine($"-{firstByte} = {-firstByte}");
             Console.WriteLine($"{firstByte} == {secondByte} = {firstByte == secondByte}");
             Console.WriteLine($"{firstByte} == {firstByte} = {firstByte == firstByte}");
             Console.WriteLine($"{firstByte} != {secondByte} = {firstByte != secondByte}");
