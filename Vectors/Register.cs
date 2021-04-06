@@ -390,7 +390,7 @@ namespace Vectors
                     count, BitShiftHelpers.SizeOf<T>());
             }
 
-            int processed = 0;
+            uint processed = 0;
 
             Register register = new(
 #if DEBUG
@@ -400,25 +400,25 @@ namespace Vectors
 
             if (blocks256 != null)
             {
-                processed = blocks256.Length << BitShiftAmountIn256Bit<T>();
+                processed = (uint)blocks256.Length << BitShiftAmountIn256Bit<T>() << BitShiftHelpers.SizeOf<T>();
 
                 Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[0],
-                    ref Unsafe.As<Vector256<T>, byte>(ref blocks256[0]), (uint)(processed << BitShiftHelpers.SizeOf<T>()));
+                    ref Unsafe.As<Vector256<T>, byte>(ref blocks256[0]), processed);
             }
 
             if (blocks128 != null)
             {
-                int count128 = blocks128.Length << BitShiftAmountIn128Bit<T>();
+                uint count128 = (uint)blocks128.Length << BitShiftAmountIn128Bit<T>() << BitShiftHelpers.SizeOf<T>();
 
-                Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[processed << BitShiftHelpers.SizeOf<T>()],
-                    ref Unsafe.As<Vector128<T>, byte>(ref blocks128[0]), (uint)(count128 << BitShiftHelpers.SizeOf<T>()));
+                Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[processed],
+                    ref Unsafe.As<Vector128<T>, byte>(ref blocks128[0]), count128);
 
                 processed += count128;
             }
 
             if (value != null)
             {
-                Unsafe.WriteUnaligned(ref register.pUInt8Values[processed << BitShiftHelpers.SizeOf<T>()], value.Value);
+                Unsafe.WriteUnaligned(ref register.pUInt8Values[processed], value.Value);
             }
 
             return register;
@@ -444,7 +444,7 @@ namespace Vectors
                     count, BitShiftHelpers.SizeOf<T>());
             }
 
-            int processed = 0;
+            uint processed = 0;
 
             Register register = new(
 #if DEBUG
@@ -454,25 +454,25 @@ namespace Vectors
 
             if (blocks256 != null)
             {
-                processed = blocks256.Length << BitShiftAmountIn256Bit<T>();
+                processed = (uint)blocks256.Length << BitShiftAmountIn256Bit<T>() << BitShiftHelpers.SizeOf<T>();
 
                 Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[0],
-                    ref Unsafe.As<Vector256<T>, byte>(ref blocks256[0]), (uint)(processed << BitShiftHelpers.SizeOf<T>()));
+                    ref Unsafe.As<Vector256<T>, byte>(ref blocks256[0]), processed);
             }
 
             if (blocks128 != null)
             {
-                int count128 = blocks128.Length << BitShiftAmountIn128Bit<T>();
+                uint count128 = (uint)blocks128.Length << BitShiftAmountIn128Bit<T>() << BitShiftHelpers.SizeOf<T>();
 
-                Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[processed << BitShiftHelpers.SizeOf<T>()],
-                    ref Unsafe.As<Vector128<T>, byte>(ref blocks128[0]), (uint)(count128 << BitShiftHelpers.SizeOf<T>()));
+                Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[processed],
+                    ref Unsafe.As<Vector128<T>, byte>(ref blocks128[0]), count128);
 
                 processed += count128;
             }
 
             if (values != null)
             {
-                Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[processed << BitShiftHelpers.SizeOf<T>()],
+                Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[processed],
                     ref Unsafe.As<T, byte>(ref values[0]), (uint)(values.Length << BitShiftHelpers.SizeOf<T>()));
             }
 

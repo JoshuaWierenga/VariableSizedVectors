@@ -990,11 +990,57 @@ namespace Vectors
                         if (remainingSubOperations > 1)
                         {
                             byte[] values = new byte[remainingSubOperations];
+                            position = 0;
 
-                            for (int i = 0; i < values.Length; i++, processedSubOperations++)
+                            //TODO Figure out if this is any faster than the for loop that was here
+                            if (remainingSubOperations >= 8)
                             {
-                                values[i] = (byte)(left._vector.GetByte(processedSubOperations) +
-                                                    right._vector.GetByte(processedSubOperations));
+                                values[0] = (byte)(left._vector.GetByte(processedSubOperations) +
+                                                    right._vector.GetByte(processedSubOperations++));
+                                values[1] = (byte)(left._vector.GetByte(processedSubOperations) +
+                                                    right._vector.GetByte(processedSubOperations++));
+                                values[2] = (byte)(left._vector.GetByte(processedSubOperations) +
+                                                    right._vector.GetByte(processedSubOperations++));
+                                values[3] = (byte)(left._vector.GetByte(processedSubOperations) +
+                                                    right._vector.GetByte(processedSubOperations++));
+                                values[4] = (byte)(left._vector.GetByte(processedSubOperations) +
+                                                    right._vector.GetByte(processedSubOperations++));
+                                values[5] = (byte)(left._vector.GetByte(processedSubOperations) +
+                                                    right._vector.GetByte(processedSubOperations++));
+                                values[6] = (byte)(left._vector.GetByte(processedSubOperations) +
+                                                    right._vector.GetByte(processedSubOperations++));
+                                values[7] = (byte)(left._vector.GetByte(processedSubOperations) +
+                                                    right._vector.GetByte(processedSubOperations++));
+                                position = 8;
+                                remainingSubOperations -= 8;
+                            }
+
+                            if (remainingSubOperations >= 4)
+                            {
+                                values[position++] = (byte)(left._vector.GetByte(processedSubOperations) +
+                                                                  right._vector.GetByte(processedSubOperations++));
+                                values[position++] = (byte)(left._vector.GetByte(processedSubOperations) +
+                                                                  right._vector.GetByte(processedSubOperations++));
+                                values[position++] = (byte)(left._vector.GetByte(processedSubOperations) +
+                                                                  right._vector.GetByte(processedSubOperations++));
+                                values[position++] = (byte)(left._vector.GetByte(processedSubOperations) +
+                                                                  right._vector.GetByte(processedSubOperations++));
+                                remainingSubOperations -= 4;
+                            }
+
+                            if (remainingSubOperations >= 2)
+                            {
+                                values[position++] = (byte)(left._vector.GetByte(processedSubOperations) +
+                                                                  right._vector.GetByte(processedSubOperations++));
+                                values[position++] = (byte)(left._vector.GetByte(processedSubOperations) +
+                                                                  right._vector.GetByte(processedSubOperations++));
+                                remainingSubOperations -= 2;
+                            }
+
+                            if (remainingSubOperations == 1)
+                            {
+                                values[position] = (byte)(left._vector.GetByte(processedSubOperations) +
+                                                                right._vector.GetByte(processedSubOperations));
                             }
 
                             return Create(count, blocks256, blocks128, values);
@@ -1132,11 +1178,57 @@ namespace Vectors
                         if (remainingSubOperations > 1)
                         {
                             sbyte[] values = new sbyte[remainingSubOperations];
+                            position = 0;
 
-                            for (int i = 0; i < values.Length; i++, processedSubOperations++)
+                            //TODO Figure out if this is any faster than the for loop that was here
+                            if (remainingSubOperations >= 8)
                             {
-                                values[i] = (sbyte)(left._vector.GetSByte(processedSubOperations) +
-                                                     right._vector.GetSByte(processedSubOperations));
+                                values[0] = (sbyte)(left._vector.GetSByte(processedSubOperations) +
+                                                    right._vector.GetSByte(processedSubOperations++));
+                                values[1] = (sbyte)(left._vector.GetSByte(processedSubOperations) +
+                                                    right._vector.GetSByte(processedSubOperations++));
+                                values[2] = (sbyte)(left._vector.GetSByte(processedSubOperations) +
+                                                    right._vector.GetSByte(processedSubOperations++));
+                                values[3] = (sbyte)(left._vector.GetSByte(processedSubOperations) +
+                                                    right._vector.GetSByte(processedSubOperations++));
+                                values[4] = (sbyte)(left._vector.GetSByte(processedSubOperations) +
+                                                    right._vector.GetSByte(processedSubOperations++));
+                                values[5] = (sbyte)(left._vector.GetSByte(processedSubOperations) +
+                                                    right._vector.GetSByte(processedSubOperations++));
+                                values[6] = (sbyte)(left._vector.GetSByte(processedSubOperations) +
+                                                    right._vector.GetSByte(processedSubOperations++));
+                                values[7] = (sbyte)(left._vector.GetSByte(processedSubOperations) +
+                                                    right._vector.GetSByte(processedSubOperations++));
+                                position = 8;
+                                remainingSubOperations -= 8;
+                            }
+
+                            if (remainingSubOperations >= 4)
+                            {
+                                values[position++] = (sbyte)(left._vector.GetSByte(processedSubOperations) +
+                                                                  right._vector.GetSByte(processedSubOperations++));
+                                values[position++] = (sbyte)(left._vector.GetSByte(processedSubOperations) +
+                                                                  right._vector.GetSByte(processedSubOperations++));
+                                values[position++] = (sbyte)(left._vector.GetSByte(processedSubOperations) +
+                                                                  right._vector.GetSByte(processedSubOperations++));
+                                values[position++] = (sbyte)(left._vector.GetSByte(processedSubOperations) +
+                                                                  right._vector.GetSByte(processedSubOperations++));
+                                remainingSubOperations -= 4;
+                            }
+
+                            if (remainingSubOperations >= 2)
+                            {
+                                values[position++] = (sbyte)(left._vector.GetSByte(processedSubOperations) +
+                                                                  right._vector.GetSByte(processedSubOperations++));
+                                values[position++] = (sbyte)(left._vector.GetSByte(processedSubOperations) +
+                                                                  right._vector.GetSByte(processedSubOperations++));
+                                remainingSubOperations -= 2;
+                            }
+
+                            if (remainingSubOperations == 1)
+                            {
+                                values[position] = (sbyte)(left._vector.GetSByte(processedSubOperations) +
+                                                                right._vector.GetSByte(processedSubOperations));
                             }
 
                             return Create(count, blocks256, blocks128, values);
@@ -1257,11 +1349,36 @@ namespace Vectors
                         if (remainingSubOperations > 1)
                         {
                             ushort[] values = new ushort[remainingSubOperations];
+                            position = 0;
 
-                            for (int i = 0; i < values.Length; i++, processedSubOperations++)
+                            //TODO Figure out if this is any faster than the for loop that was here
+                            if (remainingSubOperations >= 4)
                             {
-                                values[i] = (ushort)(left._vector.GetUShort(processedSubOperations) +
-                                                        right._vector.GetUShort(processedSubOperations));
+                                values[0] = (ushort)(left._vector.GetUShort(processedSubOperations) +
+                                                                  right._vector.GetUShort(processedSubOperations++));
+                                values[1] = (ushort)(left._vector.GetUShort(processedSubOperations) +
+                                                                  right._vector.GetUShort(processedSubOperations++));
+                                values[2] = (ushort)(left._vector.GetUShort(processedSubOperations) +
+                                                                  right._vector.GetUShort(processedSubOperations++));
+                                values[3] = (ushort)(left._vector.GetUShort(processedSubOperations) +
+                                                                  right._vector.GetUShort(processedSubOperations++));
+                                position = 4;
+                                remainingSubOperations -= 4;
+                            }
+
+                            if (remainingSubOperations >= 2)
+                            {
+                                values[position++] = (ushort)(left._vector.GetUShort(processedSubOperations) +
+                                                                  right._vector.GetUShort(processedSubOperations++));
+                                values[position++] = (ushort)(left._vector.GetUShort(processedSubOperations) +
+                                                                  right._vector.GetUShort(processedSubOperations++));
+                                remainingSubOperations -= 2;
+                            }
+
+                            if (remainingSubOperations == 1)
+                            {
+                                values[position] = (ushort)(left._vector.GetUShort(processedSubOperations) +
+                                                                right._vector.GetUShort(processedSubOperations));
                             }
 
                             return Create(count, blocks256, blocks128, values);
@@ -1382,11 +1499,36 @@ namespace Vectors
                         if (remainingSubOperations > 1)
                         {
                             short[] values = new short[remainingSubOperations];
+                            position = 0;
 
-                            for (int i = 0; i < values.Length; i++, processedSubOperations++)
+                            //TODO Figure out if this is any faster than the for loop that was here
+                            if (remainingSubOperations >= 4)
                             {
-                                values[i] = (short)(left._vector.GetShort(processedSubOperations) +
-                                                       right._vector.GetShort(processedSubOperations));
+                                values[0] = (short)(left._vector.GetShort(processedSubOperations) +
+                                                                  right._vector.GetShort(processedSubOperations++));
+                                values[1] = (short)(left._vector.GetShort(processedSubOperations) +
+                                                                  right._vector.GetShort(processedSubOperations++));
+                                values[2] = (short)(left._vector.GetShort(processedSubOperations) +
+                                                                  right._vector.GetShort(processedSubOperations++));
+                                values[3] = (short)(left._vector.GetShort(processedSubOperations) +
+                                                                  right._vector.GetShort(processedSubOperations++));
+                                position = 4;
+                                remainingSubOperations -= 4;
+                            }
+
+                            if (remainingSubOperations >= 2)
+                            {
+                                values[position++] = (short)(left._vector.GetShort(processedSubOperations) +
+                                                                  right._vector.GetShort(processedSubOperations++));
+                                values[position++] = (short)(left._vector.GetShort(processedSubOperations) +
+                                                                  right._vector.GetShort(processedSubOperations++));
+                                remainingSubOperations -= 2;
+                            }
+
+                            if (remainingSubOperations == 1)
+                            {
+                                values[position] = (short)(left._vector.GetShort(processedSubOperations) +
+                                                                right._vector.GetShort(processedSubOperations));
                             }
 
                             return Create(count, blocks256, blocks128, values);
@@ -1416,14 +1558,13 @@ namespace Vectors
                         int position = 0;
                         int arrayPosition = 4;
 
-                        //TODO Figure out if this is any faster than the for loop that was here
                         if (remaining >= 2)
                         {
-                            upperValues[0] = left._vector.GetUInt(8) + right._vector.GetUInt(8);
-                            upperValues[1] = left._vector.GetUInt(9) + right._vector.GetUInt(9);
+                            upperValues[0] = left._vector.GetUInt(4) + right._vector.GetUInt(4);
+                            upperValues[1] = left._vector.GetUInt(5) + right._vector.GetUInt(5);
                             position = 2;
                             remaining -= 2;
-                            arrayPosition = 10;
+                            arrayPosition = 6;
                         }
 
                         if (remaining == 1)
@@ -1496,10 +1637,15 @@ namespace Vectors
                         {
                             uint[] values = new uint[remainingSubOperations];
 
-                            for (int i = 0; i < values.Length; i++, processedSubOperations++)
+                            values[0] = left._vector.GetUInt(processedSubOperations) +
+                                        right._vector.GetUInt(processedSubOperations++);
+                            values[1] = left._vector.GetUInt(processedSubOperations) +
+                                        right._vector.GetUInt(processedSubOperations++);
+
+                            if (remainingSubOperations == 3)
                             {
-                                values[i] = left._vector.GetUInt(processedSubOperations) +
-                                              right._vector.GetUInt(processedSubOperations);
+                                values[2] = left._vector.GetUInt(processedSubOperations) +
+                                            right._vector.GetUInt(processedSubOperations);
                             }
 
                             return Create(count, blocks256, blocks128, values);
@@ -1530,14 +1676,13 @@ namespace Vectors
                         int position = 0;
                         int arrayPosition = 4;
 
-                        //TODO Figure out if this is any faster than the for loop that was here
                         if (remaining >= 2)
                         {
-                            upperValues[0] = left._vector.GetInt(8) + right._vector.GetInt(8);
-                            upperValues[1] = left._vector.GetInt(9) + right._vector.GetInt(9);
+                            upperValues[0] = left._vector.GetInt(4) + right._vector.GetInt(4);
+                            upperValues[1] = left._vector.GetInt(5) + right._vector.GetInt(5);
                             position = 2;
                             remaining -= 2;
-                            arrayPosition = 10;
+                            arrayPosition = 6;
                         }
 
                         if (remaining == 1)
@@ -1610,10 +1755,15 @@ namespace Vectors
                         {
                             int[] values = new int[remainingSubOperations];
 
-                            for (int i = 0; i < values.Length; i++, processedSubOperations++)
+                            values[0] = left._vector.GetInt(processedSubOperations) +
+                                        right._vector.GetInt(processedSubOperations++);
+                            values[1] = left._vector.GetInt(processedSubOperations) +
+                                        right._vector.GetInt(processedSubOperations++);
+
+                            if (remainingSubOperations == 3)
                             {
-                                values[i] = left._vector.GetInt(processedSubOperations) +
-                                              right._vector.GetInt(processedSubOperations);
+                                values[2] = left._vector.GetInt(processedSubOperations) +
+                                            right._vector.GetInt(processedSubOperations);
                             }
 
                             return Create(count, blocks256, blocks128, values);
@@ -1884,10 +2034,15 @@ namespace Vectors
                         {
                             float[] values = new float[remainingSubOperations];
 
-                            for (int i = 0; i < values.Length; i++, processedSubOperations++)
+                            values[0] = left._vector.GetFloat(processedSubOperations) +
+                                        right._vector.GetFloat(processedSubOperations++);
+                            values[1] = left._vector.GetFloat(processedSubOperations) +
+                                        right._vector.GetFloat(processedSubOperations++);
+
+                            if (remainingSubOperations == 3)
                             {
-                                values[i] = left._vector.GetFloat(processedSubOperations) +
-                                              right._vector.GetFloat(processedSubOperations);
+                                values[2] = left._vector.GetFloat(processedSubOperations) +
+                                            right._vector.GetFloat(processedSubOperations);
                             }
 
                             return Create(count, blocks256, blocks128, values);
