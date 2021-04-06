@@ -16,7 +16,6 @@ namespace Vectors
     //TODO Support operations between vectors of different types, these may not be as fast however
     //since the smaller type has to be extended to handle the bigger type, small+big=big is a given though to avoid unneeded overflow
     //TODO Add Vector.Create shorthand that gives specific vector types automatically for general type inputs
-    //TODO Retest copy methods
     public readonly struct Vector<T> : IEquatable<Vector<T>>, IFormattable where T : struct
     {
         private readonly Register _vector;
@@ -158,7 +157,8 @@ namespace Vectors
                 (uint)(_vector.Length << BitShiftHelpers.SizeOf<T>()));
         }
 
-        public readonly unsafe T this[int index] => _vector.GetValue<T>(index);
+        //TODO Fix, this will break for constant vectors when index >= the number of values of type T in 256 bits
+        public readonly unsafe T this[int index] => _vector.GetValueUnsafe<T>(index);
 
         public readonly unsafe Vector<T> Slice(int start, int length) => new(
             new Span<T>(_vector.pUInt8Values, _vector.Length << BitShiftHelpers.SizeOf<T>()).Slice(start, length));
@@ -173,19 +173,15 @@ namespace Vectors
         {
             if (_vector.Length == 1)
             {
-                return _vector.GetValue<T>(0).GetHashCode();
+                return _vector.GetValueUnsafe<T>(0).GetHashCode();
             }
 
             HashCode hashCode = default;
+            ReadOnlySpan<T> values = _vector.GetValues<T>();
 
-            //Todo Given complexity of GetValue<T>, check if it would be possible to retrieve the entire array
-            //Options I can think of include:
-            //1. Using _vector.Length << BitShiftHelpers.SizeOf<T> to get a new length and using _vector.UInt8Values
-            //2. Using MemoryMarshal.Cast<byte, T>(_vector.UInt8Values)
-            //3. Unsafe.As<byte[], T[]>(ref _vector.UInt8Values), this does not appear to work
             for (int i = 0; i < _vector.Length; i++)
             {
-                hashCode.Add(_vector.GetValue<T>(i));
+                hashCode.Add(values[i]);
             }
 
             return hashCode.ToHashCode();
@@ -199,9 +195,10 @@ namespace Vectors
         {
             StringBuilder sb = new();
             string separator = NumberFormatInfo.GetInstance(formatProvider).NumberGroupSeparator;
+            ReadOnlySpan<T> values = _vector.GetValues<T>();
 
             sb.Append('<');
-            sb.Append(((IFormattable)_vector.GetValue<T>(0)).ToString(format, formatProvider));
+            sb.Append(((IFormattable)values[0]).ToString(format, formatProvider));
 
             //TODO Decide if the hardcoded cases should be inside each other with if statements like case 3-4 or kept separate as they are now
             switch (_vector.Length)
@@ -211,31 +208,30 @@ namespace Vectors
                 case 2:
                     sb.Append(separator);
                     sb.Append(' ');
-                    sb.Append(((IFormattable)_vector.GetValue<T>(1)).ToString(format, formatProvider));
+                    sb.Append(((IFormattable)values[1]).ToString(format, formatProvider));
                     break;
                 case 3:
                 case 4:
                     sb.Append(separator);
                     sb.Append(' ');
-                    sb.Append(((IFormattable)_vector.GetValue<T>(1)).ToString(format, formatProvider));
+                    sb.Append(((IFormattable)values[1]).ToString(format, formatProvider));
                     sb.Append(separator);
                     sb.Append(' ');
-                    sb.Append(((IFormattable)_vector.GetValue<T>(2)).ToString(format, formatProvider));
+                    sb.Append(((IFormattable)values[2]).ToString(format, formatProvider));
                     if (_vector.Length == 4)
                     {
                         sb.Append(separator);
                         sb.Append(' ');
-                        sb.Append(((IFormattable)_vector.GetValue<T>(3)).ToString(format, formatProvider));
+                        sb.Append(((IFormattable)values[3]).ToString(format, formatProvider));
                     }
                     break;
 
                 default:
-                    //TODO See comment in GetHashCode for potential optimisations
                     for (int i = 1; i < _vector.Length; i++)
                     {
                         sb.Append(separator);
                         sb.Append(' ');
-                        sb.Append(((IFormattable)_vector.GetValue<T>(i)).ToString(format, formatProvider));
+                        sb.Append(((IFormattable)values[i]).ToString(format, formatProvider));
                     }
                     break;
             }
@@ -721,6 +717,15 @@ namespace Vectors
         {
             int size;
 
+            ReadOnlySpan<T> leftValues = left._vector.GetValues<T>();
+            ReadOnlySpan<T> rightValues = right._vector.GetValues<T>();
+
+            //Shortcut if both refer to the same memory location
+            if (leftValues == rightValues)
+            {
+                return true;
+            }
+
             if (left._vector.Constant)
             {
                 size = right._vector.Length;
@@ -741,13 +746,13 @@ namespace Vectors
             switch (size)
             {
                 //Full size vector instructions
-                case 2 when Sse2.IsSupported:
+                //case 2 when Sse2.IsSupported:
                 /*{
                     Vector128<double> result = Sse2.CompareEqual(left._vector.ToVector128(0), right._vector.ToVector128(0));
                     return Sse2.MoveMask(result) == 0b11;
                 }*/
-                case 3 when Avx.IsSupported:
-                case 4 when Avx.IsSupported:
+                //case 3 when Avx.IsSupported:
+                //case 4 when Avx.IsSupported:
                 /*{
                     Vector256<double> result = Avx.Compare(left._vector.ToVector256(0), right._vector.ToVector256(0),
                         FloatComparisonMode.OrderedEqualNonSignaling);
@@ -755,39 +760,33 @@ namespace Vectors
                 }*/
 
                 //Partial size vector instructions
-                case 3 when Sse2.IsSupported:
+                //case 3 when Sse2.IsSupported:
                 /*{
                     Vector128<double> result = Sse2.CompareEqual(left._vector.ToVector128(0), right._vector.ToVector128(0));
                     return Sse2.MoveMask(result) == 0b11 && left._vector.GetValue<T>(2).Equals(right._vector.GetValue<T>(2));
                 }*/
-                case 4 when Sse2.IsSupported:
+                //case 4 when Sse2.IsSupported:
                 /*{
                     Vector128<double> result1 = Sse2.CompareEqual(left._vector.ToVector128(0), right._vector.ToVector128(0));
                     Vector128<double> result2 = Sse2.CompareEqual(left._vector.ToVector128(1), right._vector.ToVector128(1));
                     return Sse2.MoveMask(result1) == 0b11 && Sse2.MoveMask(result2) == 0b11;
                 }*/
 
-                //TODO See comment in GetHashCode for potential optimisations
                 //Software fallback
-                case 1 when left._vector.GetValue<T>(0).Equals(right._vector.GetValue<T>(0)):
-                case 2 when left._vector.GetValue<T>(0).Equals(right._vector.GetValue<T>(0)) &&
-                            left._vector.GetValue<T>(1).Equals(right._vector.GetValue<T>(1)):
-                case 3 when left._vector.GetValue<T>(0).Equals(right._vector.GetValue<T>(0)) &&
-                            left._vector.GetValue<T>(1).Equals(right._vector.GetValue<T>(1)) &&
-                            left._vector.GetValue<T>(2).Equals(right._vector.GetValue<T>(2)):
-                case 4 when left._vector.GetValue<T>(0).Equals(right._vector.GetValue<T>(0)) &&
-                            left._vector.GetValue<T>(1).Equals(right._vector.GetValue<T>(1)) &&
-                            left._vector.GetValue<T>(2).Equals(right._vector.GetValue<T>(2)) &&
-                            left._vector.GetValue<T>(3).Equals(right._vector.GetValue<T>(3)):
+                case 1 when leftValues[0].Equals(rightValues[0]):
+                case 2 when leftValues[0].Equals(rightValues[0]) && leftValues[1].Equals(rightValues[1]):
+                case 3 when leftValues[0].Equals(rightValues[0]) && leftValues[1].Equals(rightValues[1]) &&
+                            leftValues[2].Equals(rightValues[2]):
+                case 4 when leftValues[0].Equals(rightValues[0]) && leftValues[1].Equals(rightValues[1]) &&
+                            leftValues[2].Equals(rightValues[2]) && leftValues[3].Equals(rightValues[3]):
                     return true;
                 case > 4:
                     //Assumption is made that no Sse2 support means no Avx support
                     if (!Sse2.IsSupported)
                     {
-                        //TODO See comment in GetHashCode for potential optimisations
                         for (int i = 0; i < size; i++)
                         {
-                            if (!left._vector.GetValue<T>(i).Equals(right._vector.GetValue<T>(i)))
+                            if (!leftValues[i].Equals(rightValues[i]))
                             {
                                 return false;
                             }
@@ -834,7 +833,9 @@ namespace Vectors
 
                     if (remainingSubOperations == 1)
                     {
-                        return left._vector.GetValue<T>(processedSubOperations).Equals(right._vector.GetValue<T>(processedSubOperations));
+                        //TODO Fix this and the rest of this function
+                        return false;
+                        //return left._vector.GetValue<T>(processedSubOperations).Equals(right._vector.GetValue<T>(processedSubOperations));
                     }
 
                     return true;
@@ -893,9 +894,6 @@ namespace Vectors
                     /*case 8 when AdvSimd.IsSupported:
                         break;*/
                     case 1:
-                        //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
-                        //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
-                        //function for each type.
                         return Create((byte)(left._vector.GetByte(0) + right._vector.GetByte(0)));
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
@@ -996,9 +994,6 @@ namespace Vectors
                     /*case 8 when AdvSimd.IsSupported:
                         break;*/
                     case 1:
-                        //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
-                        //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
-                        //function for each type.
                         return Create((sbyte)(left._vector.GetSByte(0) + right._vector.GetSByte(0)));
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
@@ -1099,9 +1094,6 @@ namespace Vectors
                     /*case 4 when AdvSimd.IsSupported:
                         break;*/
                     case 1:
-                        //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
-                        //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
-                        //function for each type.
                         return Create((ushort)(left._vector.GetUShort(0) + right._vector.GetUShort(0)));
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
@@ -1202,9 +1194,6 @@ namespace Vectors
                     /*case 4 when AdvSimd.IsSupported:
                         break;*/
                     case 1:
-                        //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
-                        //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
-                        //function for each type.
                         return Create((short)(left._vector.GetShort(0) + right._vector.GetShort(0)));
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
@@ -1274,7 +1263,6 @@ namespace Vectors
                                 (short)(left._vector.GetShort(processedSubOperations) +
                                          right._vector.GetShort(processedSubOperations)));
                         }
-                        //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
                         return Create(count, blocks256, blocks128, value: null);
                 }
             }
@@ -1305,9 +1293,6 @@ namespace Vectors
                     /*case 2 when AdvSimd.IsSupported:
                         break;*/
                     case 1:
-                        //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
-                        //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
-                        //function for each type.
                         return Create(left._vector.GetUint(0) + right._vector.GetUint(0));
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
@@ -1408,9 +1393,6 @@ namespace Vectors
                     /*case 2 when AdvSimd.IsSupported:
                         break;*/
                     case 1:
-                        //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
-                        //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
-                        //function for each type.
                         return Create(left._vector.GetInt(0) + right._vector.GetInt(0));
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
@@ -1502,9 +1484,6 @@ namespace Vectors
                         return Create(count,
                             Sse2.Add(left._vector.GetVector128ULong(0), right._vector.GetVector128ULong(0)));
                     case 1:
-                        //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
-                        //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
-                        //function for each type.
                         return Create(left._vector.GetULong(0) + right._vector.GetULong(0));
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
@@ -1584,9 +1563,6 @@ namespace Vectors
                         return Create(count,
                             Sse2.Add(left._vector.GetVector128Long(0), right._vector.GetVector128Long(0)));
                     case 1:
-                        //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
-                        //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
-                        //function for each type.
                         return Create(left._vector.GetLong(0) + right._vector.GetLong(0));
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
@@ -1676,9 +1652,6 @@ namespace Vectors
                     /*case 2 when AdvSimd.IsSupported:
                         break;*/
                     case 1:
-                        //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
-                        //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
-                        //function for each type.
                         return Create(left._vector.GetFloat(0) + right._vector.GetFloat(0));
                     default:
                         //Assumption is made that no Sse support means no Avx support
@@ -1771,9 +1744,6 @@ namespace Vectors
                             Sse2.Add(left._vector.GetVector128Double(0),
                                 right._vector.GetVector128Double(0)));
                     case 1:
-                        //TODO Redesign the Register<T> class again to expose arrays(have done most of the work already for this)
-                        //of each type, this will also remove overhead in getting VectorX<T>'s provided there is a ToVectorX
-                        //function for each type.
                         return Create(left._vector.GetDouble(0) + right._vector.GetDouble(0));
                     default:
                         //Assumption is made that no Sse2 support means no Avx support

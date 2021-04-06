@@ -480,6 +480,27 @@ namespace Vectors
         }
 
 
+        internal byte GetByte(int index) => Constant ? pUInt8Values[0] : pUInt8Values[index];
+
+        internal sbyte GetSByte(int index) => Constant ? pInt8Values[0] : pInt8Values[index];
+
+        internal ushort GetUShort(int index) => Constant ? pUInt16Values[0] : pUInt16Values[index];
+
+        internal short GetShort(int index) => Constant ? pInt16Values[0] : pInt16Values[index];
+
+        internal uint GetUint(int index) => Constant ? pUInt32Values[0] : pUInt32Values[index];
+
+        internal int GetInt(int index) => Constant ? pInt32Values[0] : pInt32Values[index];
+
+        internal ulong GetULong(int index) => Constant ? pUInt64Values[0] : pUInt64Values[index];
+
+        internal long GetLong(int index) => Constant ? pInt64Values[0] : pInt64Values[index];
+
+        internal float GetFloat(int index) => Constant ? pBinary32Values[0] : pBinary32Values[index];
+
+        internal double GetDouble(int index) => Constant ? pBinary64Values[0] : pBinary64Values[index];
+
+        
         //TODO Decide if these need bounds checking for non constants. Provided at least some values in the subvector
         //exists but no all, Unsafe.As will still will return a vector but it will contain mostly junk and may lead to crashes
         internal Vector128<byte> GetVector128Byte(int index) =>
@@ -544,51 +565,51 @@ namespace Vectors
             Constant ? pVector256Binary64Values[0] : pVector256Binary64Values[index];
 
 
-
+        //TODO Remove
         //Closest thing possible to a generic indexer when Register cannot be generic,
         //the requirement to use Unsafe is not ideal
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal T GetValue<T>(int index)
+        internal T GetValueUnsafe<T>(int index)
         {
             if (typeof(T) == typeof(byte))
             {
-                return Constant ? Unsafe.As<byte, T>(ref pUInt8Values[0]) : Unsafe.As<byte, T>(ref pUInt8Values[index]);
+                return Unsafe.As<byte, T>(ref pUInt8Values[index]);
             }
             else if (typeof(T) == typeof(sbyte))
             {
-                return Constant ? Unsafe.As<sbyte, T>(ref pInt8Values[0]) : Unsafe.As<sbyte, T>(ref pInt8Values[index]);
+                return Unsafe.As<sbyte, T>(ref pInt8Values[index]);
             }
             else if (typeof(T) == typeof(ushort))
             {
-                return Constant ? Unsafe.As<ushort, T>(ref pUInt16Values[0]) : Unsafe.As<ushort, T>(ref pUInt16Values[index]);
+                return Unsafe.As<ushort, T>(ref pUInt16Values[index]);
             }
             else if (typeof(T) == typeof(short))
             {
-                return Constant ? Unsafe.As<short, T>(ref pInt16Values[0]) : Unsafe.As<short, T>(ref pInt16Values[index]);
+                return Unsafe.As<short, T>(ref pInt16Values[index]);
             }
             else if (typeof(T) == typeof(uint))
             {
-                return Constant ? Unsafe.As<uint, T>(ref pUInt32Values[0]) : Unsafe.As<uint, T>(ref pUInt32Values[index]);
+                return Unsafe.As<uint, T>(ref pUInt32Values[index]);
             }
             else if (typeof(T) == typeof(int))
             {
-                return Constant ? Unsafe.As<int, T>(ref pInt32Values[0]) : Unsafe.As<int, T>(ref pInt32Values[index]);
+                return Unsafe.As<int, T>(ref pInt32Values[index]);
             }
             else if (typeof(T) == typeof(ulong))
             {
-                return Constant ? Unsafe.As<ulong, T>(ref pUInt64Values[0]) : Unsafe.As<ulong, T>(ref pUInt64Values[index]);
+                return Unsafe.As<ulong, T>(ref pUInt64Values[index]);
             }
             else if (typeof(T) == typeof(long))
             {
-                return Constant ? Unsafe.As<long, T>(ref pInt64Values[0]) : Unsafe.As<long, T>(ref pInt64Values[index]);
+                return Unsafe.As<long, T>(ref pInt64Values[index]);
             }
             else if (typeof(T) == typeof(float))
             {
-                return Constant ? Unsafe.As<float, T>(ref pBinary32Values[0]) : Unsafe.As<float, T>(ref pBinary32Values[index]);
+                return Unsafe.As<float, T>(ref pBinary32Values[index]);
             }
             else if (typeof(T) == typeof(double))
             {
-                return Constant ? Unsafe.As<double, T>(ref pBinary64Values[0]) : Unsafe.As<double, T>(ref pBinary64Values[index]);
+                return Unsafe.As<double, T>(ref pBinary64Values[index]);
             }
             else
             {
@@ -596,26 +617,54 @@ namespace Vectors
             }
         }
 
-
-        internal byte GetByte(int index) => Constant ? pUInt8Values[0] : pUInt8Values[index];
-
-        internal sbyte GetSByte(int index) => Constant ? pInt8Values[0] : pInt8Values[index];
-
-        internal ushort GetUShort(int index) => Constant ? pUInt16Values[0] : pUInt16Values[index];
-
-        internal short GetShort(int index) => Constant ? pInt16Values[0] : pInt16Values[index];
-
-        internal uint GetUint(int index) => Constant ? pUInt32Values[0] : pUInt32Values[index];
-
-        internal int GetInt(int index) => Constant ? pInt32Values[0] : pInt32Values[index];
-
-        internal ulong GetULong(int index) => Constant ? pUInt64Values[0] : pUInt64Values[index];
-
-        internal long GetLong(int index) => Constant ? pInt64Values[0] : pInt64Values[index];
-
-        internal float GetFloat(int index) => Constant ? pBinary32Values[0] : pBinary32Values[index];
-
-        internal double GetDouble(int index) => Constant ? pBinary64Values[0] : pBinary64Values[index];
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal ReadOnlySpan<T> GetValues<T>()
+        {
+            if (typeof(T) == typeof(byte))
+            {
+                return new ReadOnlySpan<T>(pUInt8Values, Length);
+            }
+            else if (typeof(T) == typeof(sbyte))
+            {
+                return new ReadOnlySpan<T>(pInt8Values, Length);
+            }
+            else if (typeof(T) == typeof(ushort))
+            {
+                return new ReadOnlySpan<T>(pUInt16Values, Length);
+            }
+            else if (typeof(T) == typeof(short))
+            {
+                return new ReadOnlySpan<T>(pInt16Values, Length);
+            }
+            else if (typeof(T) == typeof(uint))
+            {
+                return new ReadOnlySpan<T>(pUInt32Values, Length);
+            }
+            else if (typeof(T) == typeof(int))
+            {
+                return new ReadOnlySpan<T>(pInt32Values, Length);
+            }
+            else if (typeof(T) == typeof(ulong))
+            {
+                return new ReadOnlySpan<T>(pUInt64Values, Length);
+            }
+            else if (typeof(T) == typeof(long))
+            {
+                return new ReadOnlySpan<T>(pInt64Values, Length);
+            }
+            else if (typeof(T) == typeof(float))
+            {
+                return new ReadOnlySpan<T>(pBinary32Values, Length);
+            }
+            else if (typeof(T) == typeof(double))
+            {
+                return new ReadOnlySpan<T>(pBinary64Values, Length);
+            }
+            else
+            {
+                throw new NotSupportedException();
+            }
+        }
 
 
         //Provided I understand how AggressiveInlining and typeof work, these bitshift functions should
