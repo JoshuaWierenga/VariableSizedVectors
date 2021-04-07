@@ -725,6 +725,10 @@ namespace Vectors
             }
 
             int size;
+            int bitCount;
+            int uIntIndex;
+            int uShortIndex;
+            int byteIndex;
 
             if (left._vector.Constant)
             {
@@ -748,6 +752,7 @@ namespace Vectors
                 return left._vector.GetValueUnsafe<T>(0).Equals(right._vector.GetValueUnsafe<T>(0));
             }
 
+            //128 to 256 bit long vector cases using Sse(2) and Avx(2)
             if (typeof(T) == typeof(float))
             {
                 switch (size)
@@ -842,7 +847,6 @@ namespace Vectors
                         right._vector.GetVector256Byte(0));
                     return unchecked((uint)Avx2.MoveMask(result)) == 0xFFFFFFFF;
                 }
-                //TODO Add support for 136 though 248 bit vectors
                 if (size == SizeHelpers.NumberIn256Bits<T>() && IntrinsicSupport.IsSse2Supported)
                 {
                     Vector128<byte> result1 = Sse2.CompareEqual(left._vector.GetVector128Byte(0),
@@ -860,10 +864,10 @@ namespace Vectors
                         return false;
                     }
 
-                    int bitCount = (size << BitShiftHelpers.SizeOf<T>()) - 16;
-                    int uIntIndex = 4;
-                    int uShortIndex = 8;
-                    int byteIndex = 16;
+                    bitCount = (size << BitShiftHelpers.SizeOf<T>()) - 16;
+                    uIntIndex = 4;
+                    uShortIndex = 8;
+                    byteIndex = 16;
 
                     //This block runs if vector size is 192 to 255 bits
                     if (bitCount >= 8)
@@ -874,9 +878,9 @@ namespace Vectors
                         }
 
                         bitCount -= 8;
-                        uIntIndex = 6;
-                        uShortIndex = 12;
-                        byteIndex = 24;
+                        uIntIndex += 2;
+                        uShortIndex += 4;
+                        byteIndex += 8;
                     }
 
                     //This block runs if vector size is 160 to 255 bits
@@ -888,8 +892,8 @@ namespace Vectors
                         }
 
                         bitCount -= 4;
-                        uShortIndex = 14;
-                        byteIndex = 28;
+                        uShortIndex += 2;
+                        byteIndex += 4;
                     }
 
                     //This block runs if vector size is 144 to 255 bits
@@ -901,16 +905,13 @@ namespace Vectors
                         }
 
                         bitCount -= 2;
-                        byteIndex = 30;
+                        byteIndex += 2;
                     }
 
                     //This block runs if vector size is 136 to 255 bytes
-                    if (bitCount >= 1)
+                    if (bitCount >= 1 && !left._vector.GetByte(byteIndex).Equals(right._vector.GetByte(byteIndex)))
                     {
-                        if (!left._vector.GetByte(byteIndex).Equals(right._vector.GetByte(byteIndex)))
-                        {
-                            return false;
-                        }
+                        return false;
                     }
 
                     return true;
@@ -930,8 +931,7 @@ namespace Vectors
             ReadOnlySpan<T> rightValues = right._vector.GetValues<T>();
 
             //Assumption is made that no Sse support means no Avx support
-            //TODO Remove true once accelerated fallbacks are working, i.e. 136-248 and >256
-            if (true || !IntrinsicSupport.IsSseSupported)
+            if (size >= NumberIn128Bits() || !IntrinsicSupport.IsSseSupported)
             {
                 for (int i = 0; i < size; i++)
                 {
@@ -940,67 +940,66 @@ namespace Vectors
                         return false;
                     }
                 }
+
+                return true;
             }
 
-            switch (size)
+            //TODO Add 256 bit block processing using Avx(2) for arbitrary length vectors
+            //TODO Unroll 136 to 248 bit vector fallback code
+            //TODO Add 128 bit block processing using Sse(2) for arbitrary length vectors
+
+            //Unrolled fallback for vectors smaller than 128 bits
+            bitCount = size << BitShiftHelpers.SizeOf<T>();
+            uIntIndex = 0;
+            uShortIndex = 0;
+            byteIndex = 0;
+
+            //This block runs if vector size is 64 to 127 bits
+            if (bitCount >= 8)
             {
-                //Software fallback
-                case 2 when leftValues[0].Equals(rightValues[0]) && leftValues[1].Equals(rightValues[1]):
-                case 3 when leftValues[0].Equals(rightValues[0]) && leftValues[1].Equals(rightValues[1]) &&
-                        leftValues[2].Equals(rightValues[2]):
-                case 4 when leftValues[0].Equals(rightValues[0]) && leftValues[1].Equals(rightValues[1]) &&
-                        leftValues[2].Equals(rightValues[2]) && leftValues[3].Equals(rightValues[3]):
-                    return true;
-                case > 4:
-                    int remainingSubOperations = size;
-                    //int processedSubOperations = 0;
+                if (!left._vector.GetULong(0).Equals(right._vector.GetULong(0)))
+                {
+                    return false;
+                }
 
-                    if (Avx.IsSupported)
-                    {
-                        int count256 = remainingSubOperations >> 2;
-
-                        for (int i = 0; i < count256; i++)
-                        {
-                            /*Vector256<double> result = Avx.Compare(left._vector.ToVector256(0), right._vector.ToVector256(0),
-                                FloatComparisonMode.OrderedEqualNonSignaling);
-                            if (Avx.MoveMask(result) != 0b1111)
-                            {
-                                return false;
-                            }*/
-                        }
-
-                        remainingSubOperations -= count256 << 2;
-                        //processedSubOperations += count256 << 2;
-                    }
-
-                    if (remainingSubOperations >= 2)
-                    {
-                        int count128 = remainingSubOperations >> 1;
-
-                        for (int i = 0; i < count128; i++)
-                        {
-                            /*Vector128<double> result = Sse2.CompareEqual(left._vector.ToVector128(0), right._vector.ToVector128(0));
-                            if (Sse2.MoveMask(result) != 0b11)
-                            {
-                                return false;
-                            }*/
-                        }
-
-                        remainingSubOperations -= count128 << 1;
-                        //processedSubOperations += count128 << 1;
-                    }
-
-                    if (remainingSubOperations == 1)
-                    {
-                        //TODO Fix this and the rest of this function
-                        return false;
-                        //return left._vector.GetValue<T>(processedSubOperations).Equals(right._vector.GetValue<T>(processedSubOperations));
-                    }
-
-                    return true;
+                bitCount -= 8;
+                uIntIndex += 2;
+                uShortIndex += 4;
+                byteIndex += 8;
             }
 
-            return false;
+            //This block runs if vector size is 32 to 127 bits
+            if (bitCount >= 4)
+            {
+                if (!left._vector.GetUInt(uIntIndex).Equals(right._vector.GetUInt(uIntIndex)))
+                {
+                    return false;
+                }
+
+                bitCount -= 4;
+                uShortIndex += 2;
+                byteIndex += 4;
+            }
+
+            //This block runs if vector size is 16 to 127 bits
+            if (bitCount >= 2)
+            {
+                if (!left._vector.GetUShort(uShortIndex).Equals(right._vector.GetUShort(uShortIndex)))
+                {
+                    return false;
+                }
+
+                bitCount -= 2;
+                byteIndex = 30;
+            }
+
+            //This block runs if vector size is 8 to 127 bytes
+            if (bitCount >= 1 && !left._vector.GetByte(byteIndex).Equals(right._vector.GetByte(byteIndex)))
+            {
+                return false;
+            }
+
+            return true;
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]

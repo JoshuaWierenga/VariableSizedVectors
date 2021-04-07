@@ -617,56 +617,8 @@ namespace Vectors
             }
         }
 
-        //TODO Check if this can just use one branch since the void* constructor
-        //has no clue of the original type
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        internal ReadOnlySpan<T> GetValues<T>()
-        {
-            if (typeof(T) == typeof(byte))
-            {
-                return new ReadOnlySpan<T>(pUInt8Values, Length);
-            }
-            else if (typeof(T) == typeof(sbyte))
-            {
-                return new ReadOnlySpan<T>(pInt8Values, Length);
-            }
-            else if (typeof(T) == typeof(ushort))
-            {
-                return new ReadOnlySpan<T>(pUInt16Values, Length);
-            }
-            else if (typeof(T) == typeof(short))
-            {
-                return new ReadOnlySpan<T>(pInt16Values, Length);
-            }
-            else if (typeof(T) == typeof(uint))
-            {
-                return new ReadOnlySpan<T>(pUInt32Values, Length);
-            }
-            else if (typeof(T) == typeof(int))
-            {
-                return new ReadOnlySpan<T>(pInt32Values, Length);
-            }
-            else if (typeof(T) == typeof(ulong))
-            {
-                return new ReadOnlySpan<T>(pUInt64Values, Length);
-            }
-            else if (typeof(T) == typeof(long))
-            {
-                return new ReadOnlySpan<T>(pInt64Values, Length);
-            }
-            else if (typeof(T) == typeof(float))
-            {
-                return new ReadOnlySpan<T>(pBinary32Values, Length);
-            }
-            else if (typeof(T) == typeof(double))
-            {
-                return new ReadOnlySpan<T>(pBinary64Values, Length);
-            }
-            else
-            {
-                throw new NotSupportedException();
-            }
-        }
+        internal ReadOnlySpan<T> GetValues<T>() => new(pUInt8Values, Length);
 
 
         //Provided I understand how AggressiveInlining and typeof work, these bitshift functions should
