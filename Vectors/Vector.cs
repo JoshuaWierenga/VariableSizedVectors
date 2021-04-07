@@ -766,6 +766,31 @@ namespace Vectors
                                 right._vector.GetVector128Float(1));
                             return Sse.MoveMask(result1) == 0b1111 && Sse.MoveMask(result2) == 0b1111;
                         }
+                    case < 8 and > 4 when IntrinsicSupport.IsSse2Supported:
+                        {
+                            Vector128<double> result1 = Sse2.CompareEqual(left._vector.GetVector128Double(0),
+                                right._vector.GetVector128Double(0));
+                            if (Sse2.MoveMask(result1) != 0b11)
+                            {
+                                return false;
+                            }
+
+                            int position = 5;
+
+                            if (size >= 6)
+                            {
+                                if (!left._vector.GetFloat(5).Equals(right._vector.GetFloat(5)) &&
+                                    !left._vector.GetFloat(6).Equals(right._vector.GetFloat(6)))
+                                {
+                                    return false;
+                                }
+
+                                position = 7;
+                            }
+
+                            return size != 7 || left._vector.GetFloat(position)
+                                .Equals(right._vector.GetFloat(position));
+                        }
                     case 4 when IntrinsicSupport.IsSseSupported:
                         {
                             Vector128<float> result = Sse.CompareEqual(left._vector.GetVector128Float(0),
@@ -791,6 +816,13 @@ namespace Vectors
                             Vector128<double> result2 = Sse2.CompareEqual(left._vector.GetVector128Double(1),
                                 right._vector.GetVector128Double(1));
                             return Sse2.MoveMask(result1) == 0b11 && Sse2.MoveMask(result2) == 0b11;
+                        }
+                    case 3 when IntrinsicSupport.IsSse2Supported:
+                        {
+                            Vector128<double> result1 = Sse2.CompareEqual(left._vector.GetVector128Double(0),
+                                right._vector.GetVector128Double(0));
+                            return Sse2.MoveMask(result1) == 0b11 &&
+                                   left._vector.GetDouble(2).Equals(right._vector.GetDouble(2));
                         }
                     case 2 when IntrinsicSupport.IsSse2Supported:
                         {
@@ -819,6 +851,70 @@ namespace Vectors
                         right._vector.GetVector128Byte(1));
                     return Sse2.MoveMask(result1) == 0xFFFF && Sse2.MoveMask(result2) == 0xFFFF;
                 }
+                if (size < SizeHelpers.NumberIn256Bits<T>() && size > NumberIn128Bits() && IntrinsicSupport.IsSse2Supported)
+                {
+                    Vector128<byte> result1 = Sse2.CompareEqual(left._vector.GetVector128Byte(0),
+                        right._vector.GetVector128Byte(0));
+                    if (Sse2.MoveMask(result1) != 0xFFFF)
+                    {
+                        return false;
+                    }
+
+                    int bitCount = (size << BitShiftHelpers.SizeOf<T>()) - 16;
+                    int uIntIndex = 4;
+                    int uShortIndex = 8;
+                    int byteIndex = 16;
+
+                    //This block runs if vector size is 192 to 255 bits
+                    if (bitCount >= 8)
+                    {
+                        if (!left._vector.GetULong(2).Equals(right._vector.GetULong(2)))
+                        {
+                            return false;
+                        }
+
+                        bitCount -= 8;
+                        uIntIndex = 6;
+                        uShortIndex = 12;
+                        byteIndex = 24;
+                    }
+
+                    //This block runs if vector size is 160 to 255 bits
+                    if (bitCount >= 4)
+                    {
+                        if (!left._vector.GetUInt(uIntIndex).Equals(right._vector.GetUInt(uIntIndex)))
+                        {
+                            return false;
+                        }
+
+                        bitCount -= 4;
+                        uShortIndex = 14;
+                        byteIndex = 28;
+                    }
+
+                    //This block runs if vector size is 144 to 255 bits
+                    if (bitCount >= 2)
+                    {
+                        if (!left._vector.GetUShort(uShortIndex).Equals(right._vector.GetUShort(uShortIndex)))
+                        {
+                            return false;
+                        }
+
+                        bitCount -= 2;
+                        byteIndex = 30;
+                    }
+
+                    //This block runs if vector size is 136 to 255 bytes
+                    if (bitCount >= 1)
+                    {
+                        if (!left._vector.GetByte(byteIndex).Equals(right._vector.GetByte(byteIndex)))
+                        {
+                            return false;
+                        }
+                    }
+
+                    return true;
+                }
                 if (size == NumberIn128Bits() && IntrinsicSupport.IsSse2Supported)
                 {
                     Vector128<byte> result = Sse2.CompareEqual(left._vector.GetVector128Byte(0),
@@ -829,6 +925,7 @@ namespace Vectors
                 //TODO Check if arm supports Vector64<T> equality checking and if so use it
             }
 
+            //TODO Fix, this fails for constant values
             ReadOnlySpan<T> leftValues = left._vector.GetValues<T>();
             ReadOnlySpan<T> rightValues = right._vector.GetValues<T>();
 
@@ -1845,12 +1942,9 @@ namespace Vectors
                         return Create(count,
                             Avx2.Add(left._vector.GetVector256ULong(0), right._vector.GetVector256ULong(0)));
                     case 3 when IntrinsicSupport.IsSse2Supported:
-                        Vector128<ulong> lower128 = Sse2.Add(left._vector.GetVector128ULong(0),
-                            right._vector.GetVector128ULong(0));
-
-                        ulong upperValue = left._vector.GetULong(3) + right._vector.GetULong(3);
-
-                        return Create(count, lower128, upperValue);
+                        return Create(count,
+                            Sse2.Add(left._vector.GetVector128ULong(0), right._vector.GetVector128ULong(0)),
+                            left._vector.GetULong(3) + right._vector.GetULong(3));
                     case 2 when IntrinsicSupport.IsSse2Supported:
                         return Create(count,
                             Sse2.Add(left._vector.GetVector128ULong(0), right._vector.GetVector128ULong(0)));
@@ -1924,12 +2018,9 @@ namespace Vectors
                         return Create(count,
                             Avx2.Add(left._vector.GetVector256Long(0), right._vector.GetVector256Long(0)));
                     case 3 when IntrinsicSupport.IsSse2Supported:
-                        Vector128<long> lower128 = Sse2.Add(left._vector.GetVector128Long(0),
-                            right._vector.GetVector128Long(0));
-
-                        long upperValue = left._vector.GetLong(3) + right._vector.GetLong(3);
-
-                        return Create(count, lower128, upperValue);
+                        return Create(count,
+                            Sse2.Add(left._vector.GetVector128Long(0), right._vector.GetVector128Long(0)),
+                            left._vector.GetLong(3) + right._vector.GetLong(3));
                     case 2 when IntrinsicSupport.IsSse2Supported:
                         return Create(count,
                             Sse2.Add(left._vector.GetVector128Long(0), right._vector.GetVector128Long(0)));
@@ -2124,12 +2215,9 @@ namespace Vectors
                         return Create(count,
                             Avx.Add(left._vector.GetVector256Double(0), right._vector.GetVector256Double(0)));
                     case 3 when IntrinsicSupport.IsSse2Supported:
-                        Vector128<double> lower128 = Sse2.Add(left._vector.GetVector128Double(0),
-                            right._vector.GetVector128Double(0));
-
-                        double upperValue = left._vector.GetDouble(3) + right._vector.GetDouble(3);
-
-                        return Create(count, lower128, upperValue);
+                        return Create(count,
+                            Sse2.Add(left._vector.GetVector128Double(0), right._vector.GetVector128Double(0)),
+                            left._vector.GetDouble(3) + right._vector.GetDouble(3));
                     case 2 when IntrinsicSupport.IsSse2Supported:
                         return Create(count,
                             Sse2.Add(left._vector.GetVector128Double(0),
