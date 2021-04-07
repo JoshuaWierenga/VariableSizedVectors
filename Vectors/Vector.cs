@@ -743,22 +743,35 @@ namespace Vectors
                 size = left._vector.Length;
             }
 
+            if (size == 1)
+            {
+                return left._vector.GetValueUnsafe<T>(0).Equals(right._vector.GetValueUnsafe<T>(0));
+            }
+
             if (typeof(T) == typeof(float))
             {
                 switch (size)
                 {
                     case 8 when IntrinsicSupport.IsAvxSupported:
-                    {
-                        Vector256<float> result = Avx.Compare(left._vector.GetVector256Float(0),
-                            right._vector.GetVector256Float(0), FloatComparisonMode.OrderedEqualNonSignaling);
-                        return Avx.MoveMask(result) == 0b11111111;
-                    }
+                        {
+                            Vector256<float> result = Avx.Compare(left._vector.GetVector256Float(0),
+                                right._vector.GetVector256Float(0), FloatComparisonMode.OrderedEqualNonSignaling);
+                            return Avx.MoveMask(result) == 0b11111111;
+                        }
+                    case 8 when IntrinsicSupport.IsSseSupported:
+                        {
+                            Vector128<float> result1 = Sse.CompareEqual(left._vector.GetVector128Float(0),
+                                right._vector.GetVector128Float(0));
+                            Vector128<float> result2 = Sse.CompareEqual(left._vector.GetVector128Float(1),
+                                right._vector.GetVector128Float(1));
+                            return Sse.MoveMask(result1) == 0b1111 && Sse.MoveMask(result2) == 0b1111;
+                        }
                     case 4 when IntrinsicSupport.IsSseSupported:
-                    {
-                        Vector128<float> result = Sse.CompareEqual(left._vector.GetVector128Float(0),
-                            right._vector.GetVector128Float(0));
-                        return Sse.MoveMask(result) == 0b1111;
-                    }
+                        {
+                            Vector128<float> result = Sse.CompareEqual(left._vector.GetVector128Float(0),
+                                right._vector.GetVector128Float(0));
+                            return Sse.MoveMask(result) == 0b1111;
+                        }
                 }
             }
             else if (typeof(T) == typeof(double))
@@ -766,17 +779,25 @@ namespace Vectors
                 switch (size)
                 {
                     case 4 when IntrinsicSupport.IsAvxSupported:
-                    {
-                        Vector256<double> result = Avx.Compare(left._vector.GetVector256Double(0),
-                            right._vector.GetVector256Double(0), FloatComparisonMode.OrderedEqualNonSignaling);
-                        return Avx.MoveMask(result) == 0b1111;
-                    }
+                        {
+                            Vector256<double> result = Avx.Compare(left._vector.GetVector256Double(0),
+                                right._vector.GetVector256Double(0), FloatComparisonMode.OrderedEqualNonSignaling);
+                            return Avx.MoveMask(result) == 0b1111;
+                        }
+                    case 4 when IntrinsicSupport.IsSse2Supported:
+                        {
+                            Vector128<double> result1 = Sse2.CompareEqual(left._vector.GetVector128Double(0),
+                                right._vector.GetVector128Double(0));
+                            Vector128<double> result2 = Sse2.CompareEqual(left._vector.GetVector128Double(1),
+                                right._vector.GetVector128Double(1));
+                            return Sse2.MoveMask(result1) == 0b11 && Sse2.MoveMask(result2) == 0b11;
+                        }
                     case 2 when IntrinsicSupport.IsSse2Supported:
-                    {
-                        Vector128<double> result = Sse2.CompareEqual(left._vector.GetVector128Double(0),
-                            right._vector.GetVector128Double(0));
-                        return Sse2.MoveMask(result) == 0b11;
-                    }
+                        {
+                            Vector128<double> result = Sse2.CompareEqual(left._vector.GetVector128Double(0),
+                                right._vector.GetVector128Double(0));
+                            return Sse2.MoveMask(result) == 0b11;
+                        }
                 }
             }
             //There are no MoveMask commands for types other than byte, float and double so just using byte
@@ -790,7 +811,14 @@ namespace Vectors
                     return unchecked((uint)Avx2.MoveMask(result)) == 0xFFFFFFFF;
                 }
                 //TODO Add support for 136 though 248 bit vectors
-                //TODO Add Sse2 fallback for 256 bit vectors
+                if (size == SizeHelpers.NumberIn256Bits<T>() && IntrinsicSupport.IsSse2Supported)
+                {
+                    Vector128<byte> result1 = Sse2.CompareEqual(left._vector.GetVector128Byte(0),
+                        right._vector.GetVector128Byte(0));
+                    Vector128<byte> result2 = Sse2.CompareEqual(left._vector.GetVector128Byte(1),
+                        right._vector.GetVector128Byte(1));
+                    return Sse2.MoveMask(result1) == 0xFFFF && Sse2.MoveMask(result2) == 0xFFFF;
+                }
                 if (size == NumberIn128Bits() && IntrinsicSupport.IsSse2Supported)
                 {
                     Vector128<byte> result = Sse2.CompareEqual(left._vector.GetVector128Byte(0),
@@ -805,7 +833,7 @@ namespace Vectors
             ReadOnlySpan<T> rightValues = right._vector.GetValues<T>();
 
             //Assumption is made that no Sse support means no Avx support
-            //TODO Remove true once single value and accelerated fallbacks are working, i.e. 136-248 and >256
+            //TODO Remove true once accelerated fallbacks are working, i.e. 136-248 and >256
             if (true || !IntrinsicSupport.IsSseSupported)
             {
                 for (int i = 0; i < size; i++)
@@ -819,26 +847,12 @@ namespace Vectors
 
             switch (size)
             {
-                //Partial size vector instructions
-                //case 3 when Sse2.IsSupported:
-                /*{
-                    Vector128<double> result = Sse2.CompareEqual(left._vector.ToVector128(0), right._vector.ToVector128(0));
-                    return Sse2.MoveMask(result) == 0b11 && left._vector.GetValue<T>(2).Equals(right._vector.GetValue<T>(2));
-                }*/
-                //case 4 when Sse2.IsSupported:
-                /*{
-                    Vector128<double> result1 = Sse2.CompareEqual(left._vector.ToVector128(0), right._vector.ToVector128(0));
-                    Vector128<double> result2 = Sse2.CompareEqual(left._vector.ToVector128(1), right._vector.ToVector128(1));
-                    return Sse2.MoveMask(result1) == 0b11 && Sse2.MoveMask(result2) == 0b11;
-                }*/
-
                 //Software fallback
-                case 1 when leftValues[0].Equals(rightValues[0]):
                 case 2 when leftValues[0].Equals(rightValues[0]) && leftValues[1].Equals(rightValues[1]):
                 case 3 when leftValues[0].Equals(rightValues[0]) && leftValues[1].Equals(rightValues[1]) &&
-                            leftValues[2].Equals(rightValues[2]):
+                        leftValues[2].Equals(rightValues[2]):
                 case 4 when leftValues[0].Equals(rightValues[0]) && leftValues[1].Equals(rightValues[1]) &&
-                            leftValues[2].Equals(rightValues[2]) && leftValues[3].Equals(rightValues[3]):
+                        leftValues[2].Equals(rightValues[2]) && leftValues[3].Equals(rightValues[3]):
                     return true;
                 case > 4:
                     int remainingSubOperations = size;
