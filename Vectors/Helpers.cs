@@ -60,6 +60,59 @@ namespace Vectors
         }
     }
 
+    internal static class SizeHelpers
+    {
+        //This is the result of 256/(Unsafe.SizeOf<T>*8)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal static int NumberIn256Bits<T>()
+        {
+            if (typeof(T) == typeof(byte))
+            {
+                return 32;
+            }
+            else if (typeof(T) == typeof(sbyte))
+            {
+                return 32;
+            }
+            else if (typeof(T) == typeof(ushort))
+            {
+                return 16;
+            }
+            else if (typeof(T) == typeof(short))
+            {
+                return 16;
+            }
+            else if (typeof(T) == typeof(uint))
+            {
+                return 8;
+            }
+            else if (typeof(T) == typeof(int))
+            {
+                return 8;
+            }
+            else if (typeof(T) == typeof(ulong))
+            {
+                return 4;
+            }
+            else if (typeof(T) == typeof(long))
+            {
+                return 4;
+            }
+            else if (typeof(T) == typeof(float))
+            {
+                return 8;
+            }
+            else if (typeof(T) == typeof(double))
+            {
+                return 4;
+            }
+            else
+            {
+                throw new NotSupportedException();
+            }
+        }
+    }
+
     //X.IsSupported is used all over Vector<T>, this should sightly improve performance by only doing each check once
     internal static class IntrinsicSupport
     {

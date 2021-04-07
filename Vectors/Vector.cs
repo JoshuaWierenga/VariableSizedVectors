@@ -715,16 +715,16 @@ namespace Vectors
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static bool operator ==(Vector<T> left, Vector<T> right)
         {
-            int size;
-
-            ReadOnlySpan<T> leftValues = left._vector.GetValues<T>();
-            ReadOnlySpan<T> rightValues = right._vector.GetValues<T>();
-
             //Shortcut if both refer to the same memory location
-            if (leftValues == rightValues)
+            unsafe
             {
-                return true;
+                if (left._vector.pUInt8Values == right._vector.pUInt8Values)
+                {
+                    return true;
+                }
             }
+
+            int size;
 
             if (left._vector.Constant)
             {
@@ -743,22 +743,82 @@ namespace Vectors
                 size = left._vector.Length;
             }
 
+            if (typeof(T) == typeof(float))
+            {
+                switch (size)
+                {
+                    case 8 when IntrinsicSupport.IsAvxSupported:
+                    {
+                        Vector256<float> result = Avx.Compare(left._vector.GetVector256Float(0),
+                            right._vector.GetVector256Float(0), FloatComparisonMode.OrderedEqualNonSignaling);
+                        return Avx.MoveMask(result) == 0b11111111;
+                    }
+                    case 4 when IntrinsicSupport.IsSseSupported:
+                    {
+                        Vector128<float> result = Sse.CompareEqual(left._vector.GetVector128Float(0),
+                            right._vector.GetVector128Float(0));
+                        return Sse.MoveMask(result) == 0b1111;
+                    }
+                }
+            }
+            else if (typeof(T) == typeof(double))
+            {
+                switch (size)
+                {
+                    case 4 when IntrinsicSupport.IsAvxSupported:
+                    {
+                        Vector256<double> result = Avx.Compare(left._vector.GetVector256Double(0),
+                            right._vector.GetVector256Double(0), FloatComparisonMode.OrderedEqualNonSignaling);
+                        return Avx.MoveMask(result) == 0b1111;
+                    }
+                    case 2 when IntrinsicSupport.IsSse2Supported:
+                    {
+                        Vector128<double> result = Sse2.CompareEqual(left._vector.GetVector128Double(0),
+                            right._vector.GetVector128Double(0));
+                        return Sse2.MoveMask(result) == 0b11;
+                    }
+                }
+            }
+            //There are no MoveMask commands for types other than byte, float and double so just using byte
+            //Comments on https://stackoverflow.com/a/47244428 suggest that this is fine and shouldn't affect performance
+            else
+            {
+                if (size == SizeHelpers.NumberIn256Bits<T>() && IntrinsicSupport.IsAvx2Supported)
+                {
+                    Vector256<byte> result = Avx2.CompareEqual(left._vector.GetVector256Byte(0),
+                        right._vector.GetVector256Byte(0));
+                    return unchecked((uint)Avx2.MoveMask(result)) == 0xFFFFFFFF;
+                }
+                //TODO Add support for 136 though 248 bit vectors
+                //TODO Add Sse2 fallback for 256 bit vectors
+                if (size == NumberIn128Bits() && IntrinsicSupport.IsSse2Supported)
+                {
+                    Vector128<byte> result = Sse2.CompareEqual(left._vector.GetVector128Byte(0),
+                        right._vector.GetVector128Byte(0));
+                    //TODO Confirm this needs a different number for comparision of different T
+                    return Sse2.MoveMask(result) == 0xFFFF;
+                }
+                //TODO Check if arm supports Vector64<T> equality checking and if so use it
+            }
+
+            ReadOnlySpan<T> leftValues = left._vector.GetValues<T>();
+            ReadOnlySpan<T> rightValues = right._vector.GetValues<T>();
+
+            //Assumption is made that no Sse support means no Avx support
+            //TODO Remove true once single value and accelerated fallbacks are working, i.e. 136-248 and >256
+            if (true || !IntrinsicSupport.IsSseSupported)
+            {
+                for (int i = 0; i < size; i++)
+                {
+                    if (!leftValues[i].Equals(rightValues[i]))
+                    {
+                        return false;
+                    }
+                }
+            }
+
             switch (size)
             {
-                //Full size vector instructions
-                //case 2 when Sse2.IsSupported:
-                /*{
-                    Vector128<double> result = Sse2.CompareEqual(left._vector.ToVector128(0), right._vector.ToVector128(0));
-                    return Sse2.MoveMask(result) == 0b11;
-                }*/
-                //case 3 when Avx.IsSupported:
-                //case 4 when Avx.IsSupported:
-                /*{
-                    Vector256<double> result = Avx.Compare(left._vector.ToVector256(0), right._vector.ToVector256(0),
-                        FloatComparisonMode.OrderedEqualNonSignaling);
-                    return Avx.MoveMask(result) == 0b1111;
-                }*/
-
                 //Partial size vector instructions
                 //case 3 when Sse2.IsSupported:
                 /*{
@@ -781,20 +841,8 @@ namespace Vectors
                             leftValues[2].Equals(rightValues[2]) && leftValues[3].Equals(rightValues[3]):
                     return true;
                 case > 4:
-                    //Assumption is made that no Sse2 support means no Avx support
-                    if (!Sse2.IsSupported)
-                    {
-                        for (int i = 0; i < size; i++)
-                        {
-                            if (!leftValues[i].Equals(rightValues[i]))
-                            {
-                                return false;
-                            }
-                        }
-                    }
-
                     int remainingSubOperations = size;
-                    int processedSubOperations = 0;
+                    //int processedSubOperations = 0;
 
                     if (Avx.IsSupported)
                     {
@@ -811,7 +859,7 @@ namespace Vectors
                         }
 
                         remainingSubOperations -= count256 << 2;
-                        processedSubOperations += count256 << 2;
+                        //processedSubOperations += count256 << 2;
                     }
 
                     if (remainingSubOperations >= 2)
@@ -828,7 +876,7 @@ namespace Vectors
                         }
 
                         remainingSubOperations -= count128 << 1;
-                        processedSubOperations += count128 << 1;
+                        //processedSubOperations += count128 << 1;
                     }
 
                     if (remainingSubOperations == 1)
@@ -851,9 +899,6 @@ namespace Vectors
         //TODO Find way to merge branches since other than types, they all contain the same code
         //TODO Ensure constants are set correctly, is it worth making the constant for each type a variable in each if case?
         //There are functions in Register<T> to calculate them but that feels unnecessary since those are for generic cases
-        //TODO Is it worth unrolling 16 though 120 bit operations(i.e. 2-15 (s)bytes, 2-7 (u)shorts and 2-3 (u)ints/floats)?
-        //TODO Optimise arbitrary length remainder(<128bit) code since the maximum size is fixed and so can be unrolled, 
-        //more so for 32 bit and perhaps 16 bit numbers
         //This method performs addition on the vectors left and right.
         //If x86 vector extensions are supported then this method first handles the conversion of Vector<T>s to some
         //intermediate Vector128<U>/Vector256<U> where U is the same as T but has to be named differently to get around
@@ -2136,6 +2181,57 @@ namespace Vectors
 
                         return Create(count, blocks256, blocks128, value: null);
                 }
+            }
+            else
+            {
+                throw new NotSupportedException();
+            }
+        }
+
+
+        //This is the result of 128/(Unsafe.SizeOf<T>*8)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static int NumberIn128Bits()
+        {
+            if (typeof(T) == typeof(byte))
+            {
+                return 16;
+            }
+            else if (typeof(T) == typeof(sbyte))
+            {
+                return 16;
+            }
+            else if (typeof(T) == typeof(ushort))
+            {
+                return 8;
+            }
+            else if (typeof(T) == typeof(short))
+            {
+                return 8;
+            }
+            else if (typeof(T) == typeof(uint))
+            {
+                return 4;
+            }
+            else if (typeof(T) == typeof(int))
+            {
+                return 4;
+            }
+            else if (typeof(T) == typeof(ulong))
+            {
+                return 2;
+            }
+            else if (typeof(T) == typeof(long))
+            {
+                return 2;
+            }
+            else if (typeof(T) == typeof(float))
+            {
+                return 4;
+            }
+            else if (typeof(T) == typeof(double))
+            {
+                return 2;
             }
             else
             {

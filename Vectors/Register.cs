@@ -218,9 +218,9 @@ namespace Vectors
 #if DEBUG
                 typeof(T), SizeOf<T>(),
 #endif
-                NumberIn256Bits<T>(), BitShiftHelpers.SizeOf<T>(), true);
+                SizeHelpers.NumberIn256Bits<T>(), BitShiftHelpers.SizeOf<T>(), true);
 
-            for (int i = 0; i < NumberIn256Bits<T>(); i++)
+            for (int i = 0; i < SizeHelpers.NumberIn256Bits<T>(); i++)
             {
                 Unsafe.WriteUnaligned(ref register.pUInt8Values[i << BitShiftHelpers.SizeOf<T>()], value);
             }
@@ -617,6 +617,8 @@ namespace Vectors
             }
         }
 
+        //TODO Check if this can just use one branch since the void* constructor
+        //has no clue of the original type
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal ReadOnlySpan<T> GetValues<T>()
         {
@@ -816,108 +818,6 @@ namespace Vectors
             else if (typeof(T) == typeof(double))
             {
                 return 64;
-            }
-            else
-            {
-                throw new NotSupportedException();
-            }
-        }
-
-
-        //TODO Use or Remove
-        //This is the result of 128/(Unsafe.SizeOf<T>*8)
-        /*[MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int NumberIn128Bits()
-        {
-            if (typeof(T) == typeof(byte))
-            {
-                return 16;
-            }
-            else if (typeof(T) == typeof(sbyte))
-            {
-                return 16;
-            }
-            else if (typeof(T) == typeof(ushort))
-            {
-                return 8;
-            }
-            else if (typeof(T) == typeof(short))
-            {
-                return 8;
-            }
-            else if (typeof(T) == typeof(uint))
-            {
-                return 4;
-            }
-            else if (typeof(T) == typeof(int))
-            {
-                return 4;
-            }
-            else if (typeof(T) == typeof(ulong))
-            {
-                return 2;
-            }
-            else if (typeof(T) == typeof(long))
-            {
-                return 2;
-            }
-            else if (typeof(T) == typeof(float))
-            {
-                return 4;
-            }
-            else if (typeof(T) == typeof(double))
-            {
-                return 2;
-            }
-            else
-            {
-                throw new NotSupportedException();
-            }
-        }*/
-
-        //This is the result of 256/(Unsafe.SizeOf<T>*8)
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static int NumberIn256Bits<T>()
-        {
-            if (typeof(T) == typeof(byte))
-            {
-                return 32;
-            }
-            else if (typeof(T) == typeof(sbyte))
-            {
-                return 32;
-            }
-            else if (typeof(T) == typeof(ushort))
-            {
-                return 16;
-            }
-            else if (typeof(T) == typeof(short))
-            {
-                return 16;
-            }
-            else if (typeof(T) == typeof(uint))
-            {
-                return 8;
-            }
-            else if (typeof(T) == typeof(int))
-            {
-                return 8;
-            }
-            else if (typeof(T) == typeof(ulong))
-            {
-                return 4;
-            }
-            else if (typeof(T) == typeof(long))
-            {
-                return 4;
-            }
-            else if (typeof(T) == typeof(float))
-            {
-                return 8;
-            }
-            else if (typeof(T) == typeof(double))
-            {
-                return 4;
             }
             else
             {
