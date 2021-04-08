@@ -725,7 +725,7 @@ namespace Vectors
             }
 
             int size;
-            int bitCount;
+            int byteCount;
             int uIntIndex;
             int uShortIndex;
             int byteIndex;
@@ -864,52 +864,52 @@ namespace Vectors
                         return false;
                     }
 
-                    bitCount = (size << BitShiftHelpers.SizeOf<T>()) - 16;
+                    byteCount = (size << BitShiftHelpers.SizeOf<T>()) - 16;
                     uIntIndex = 4;
                     uShortIndex = 8;
                     byteIndex = 16;
 
                     //This block runs if vector size is 192 to 255 bits
-                    if (bitCount >= 8)
+                    if (byteCount >= 8)
                     {
                         if (!left._vector.GetULong(2).Equals(right._vector.GetULong(2)))
                         {
                             return false;
                         }
 
-                        bitCount -= 8;
+                        byteCount -= 8;
                         uIntIndex += 2;
                         uShortIndex += 4;
                         byteIndex += 8;
                     }
 
                     //This block runs if vector size is 160 to 255 bits
-                    if (bitCount >= 4)
+                    if (byteCount >= 4)
                     {
                         if (!left._vector.GetUInt(uIntIndex).Equals(right._vector.GetUInt(uIntIndex)))
                         {
                             return false;
                         }
 
-                        bitCount -= 4;
+                        byteCount -= 4;
                         uShortIndex += 2;
                         byteIndex += 4;
                     }
 
                     //This block runs if vector size is 144 to 255 bits
-                    if (bitCount >= 2)
+                    if (byteCount >= 2)
                     {
                         if (!left._vector.GetUShort(uShortIndex).Equals(right._vector.GetUShort(uShortIndex)))
                         {
                             return false;
                         }
 
-                        bitCount -= 2;
+                        byteCount -= 2;
                         byteIndex += 2;
                     }
 
                     //This block runs if vector size is 136 to 255 bytes
-                    if (bitCount >= 1 && !left._vector.GetByte(byteIndex).Equals(right._vector.GetByte(byteIndex)))
+                    if (byteCount >= 1 && !left._vector.GetByte(byteIndex).Equals(right._vector.GetByte(byteIndex)))
                     {
                         return false;
                     }
@@ -931,7 +931,7 @@ namespace Vectors
             ReadOnlySpan<T> rightValues = right._vector.GetValues<T>();
 
             //Assumption is made that no Sse support means no Avx support
-            if (size >= NumberIn128Bits() || !IntrinsicSupport.IsSseSupported)
+            if (size >= SizeHelpers.NumberIn256Bits<T>() || IntrinsicSupport.IsSseSupported)
             {
                 for (int i = 0; i < size; i++)
                 {
@@ -948,53 +948,86 @@ namespace Vectors
             //TODO Unroll 136 to 248 bit vector fallback code
             //TODO Add 128 bit block processing using Sse(2) for arbitrary length vectors
 
-            //Unrolled fallback for vectors smaller than 128 bits
-            bitCount = size << BitShiftHelpers.SizeOf<T>();
-            uIntIndex = 0;
-            uShortIndex = 0;
-            byteIndex = 0;
+            //Unrolled fallback for vectors smaller than 256 bits
+            byteCount = size << BitShiftHelpers.SizeOf<T>();
 
-            //This block runs if vector size is 64 to 127 bits
-            if (bitCount >= 8)
+            //TODO Add backwards operation to remove everything after the else
+            //This block runs if vector size is 192 to 248 bits
+            if (byteCount >= 24)
+            {
+                if (!left._vector.GetULong(0).Equals(right._vector.GetULong(0)) ||
+                    !left._vector.GetULong(1).Equals(right._vector.GetULong(1)) ||
+                    !left._vector.GetULong(2).Equals(right._vector.GetULong(2)))
+                {
+                    return false;
+                }
+
+                byteCount -= 24;
+                uIntIndex = 6;
+                uShortIndex = 12;
+                byteIndex = 24;
+            }
+            //This block runs if vector size is 128 to 184 bits
+            else if (byteCount >= 16)
+            {
+                if (!left._vector.GetULong(0).Equals(right._vector.GetULong(0)) ||
+                    !left._vector.GetULong(1).Equals(right._vector.GetULong(1)))
+                {
+                    return false;
+                }
+
+                byteCount -= 16;
+                uIntIndex = 4;
+                uShortIndex = 8;
+                byteIndex = 16;
+            }
+            //This block runs if vector size is 64 to 120 bits
+            else if (byteCount >= 8)
             {
                 if (!left._vector.GetULong(0).Equals(right._vector.GetULong(0)))
                 {
                     return false;
                 }
 
-                bitCount -= 8;
-                uIntIndex += 2;
-                uShortIndex += 4;
-                byteIndex += 8;
+                byteCount -= 8;
+                uIntIndex = 2;
+                uShortIndex = 4;
+                byteIndex = 8;
+            }
+            else
+            {
+                uIntIndex = 0;
+                uShortIndex = 0;
+                byteIndex = 0;
             }
 
-            //This block runs if vector size is 32 to 127 bits
-            if (bitCount >= 4)
+            //This block runs if vector size is 32 to 248 bits
+            if (byteCount >= 4)
             {
                 if (!left._vector.GetUInt(uIntIndex).Equals(right._vector.GetUInt(uIntIndex)))
                 {
                     return false;
                 }
 
-                bitCount -= 4;
+                byteCount -= 4;
                 uShortIndex += 2;
                 byteIndex += 4;
             }
 
-            //This block runs if vector size is 16 to 127 bits
-            if (bitCount >= 2)
+            //This block runs if vector size is 16 to 248 bits
+            if (byteCount >= 2)
             {
                 if (!left._vector.GetUShort(uShortIndex).Equals(right._vector.GetUShort(uShortIndex)))
                 {
                     return false;
                 }
 
-                bitCount -= 2;
-                byteIndex = 30;
+                byteCount -= 2;
+                byteIndex += 2;
             }
 
-            //This block runs if vector size is 8 to 127 bytes
-            if (bitCount >= 1 && !left._vector.GetByte(byteIndex).Equals(right._vector.GetByte(byteIndex)))
+            //This block runs if vector size is 8 to 248 bytes
+            if (byteCount >= 1 && !left._vector.GetByte(byteIndex).Equals(right._vector.GetByte(byteIndex)))
             {
                 return false;
             }

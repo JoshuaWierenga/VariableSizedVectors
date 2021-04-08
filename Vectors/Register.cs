@@ -271,7 +271,7 @@ namespace Vectors
                 values.Length >> BitShiftHelpers.SizeOf<T>(), BitShiftHelpers.SizeOf<T>());
 
             Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[0], ref MemoryMarshal.GetReference(values),
-                (uint) (values.Length << BitShiftHelpers.SizeOf<T>()));
+                (uint)(values.Length << BitShiftHelpers.SizeOf<T>()));
 
             return register;
         }
@@ -500,7 +500,7 @@ namespace Vectors
 
         internal double GetDouble(int index) => Constant ? pBinary64Values[0] : pBinary64Values[index];
 
-        
+
         //TODO Decide if these need bounds checking for non constants. Provided at least some values in the subvector
         //exists but no all, Unsafe.As will still will return a vector but it will contain mostly junk and may lead to crashes
         internal Vector128<byte> GetVector128Byte(int index) =>
@@ -617,6 +617,7 @@ namespace Vectors
             }
         }
 
+        //Only gives an array of the right size if T is the original type used in one of the Create function
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal ReadOnlySpan<T> GetValues<T>() => new(pUInt8Values, Length);
 
