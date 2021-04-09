@@ -98,15 +98,15 @@ namespace Vectors
         //as well as smaller types when the vector is composed of some number of 256 bit blocks, some number of 
         //128 bit blocks and then zero or one extra value
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Vector<T> Create<U>(int count, Vector256<U>[] blocks256 = null, Vector128<U>[] blocks128 = null,
-            U? value = null) where U : struct => new(Register.Create(count, blocks256, blocks128, value));
+        private static Vector<T> Create<U, V>(int count, Vector256<V>[] blocks256 = null, Vector128<V>[] blocks128 = null,
+            U? value = null) where U : struct where V : struct => new(Register.Create(count, blocks256, blocks128, value));
 
         //Used for all x86 Sse(2) and Avx(2) optimised operations on vectors larger than 256 bits for all types
         //smaller than 64 bit where the vector is composed of some number of 256 bit blocks, some number of 128
         //bit blocks and then 2 or more extra values
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Vector<T> Create<U>(int count, Vector256<U>[] blocks256 = null, Vector128<U>[] blocks128 = null,
-            U[] values = null) where U : struct => new(Register.Create(count, blocks256, blocks128, values));
+        private static Vector<T> Create<U, V>(int count, Vector256<V>[] blocks256 = null, Vector128<V>[] blocks128 = null,
+            U[] values = null) where U : struct where V : struct => new(Register.Create(count, blocks256, blocks128, values));
 
 
         public readonly void CopyTo(Span<byte> destination)
@@ -487,12 +487,12 @@ namespace Vectors
                         }
                         else if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<byte, byte>(count, blocks256, blocks128,
                                 (byte)(left._vector.GetByte(processedSubOperations) +
                                         right._vector.GetByte(processedSubOperations)));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<byte, byte>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(sbyte))
@@ -675,12 +675,12 @@ namespace Vectors
                         }
                         else if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<sbyte, sbyte>(count, blocks256, blocks128,
                                 (sbyte)(left._vector.GetSByte(processedSubOperations) +
                                          right._vector.GetSByte(processedSubOperations)));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<sbyte, sbyte>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(ushort))
@@ -825,12 +825,12 @@ namespace Vectors
                         }
                         else if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<ushort, ushort>(count, blocks256, blocks128,
                                 (ushort)(left._vector.GetUShort(processedSubOperations) +
                                          right._vector.GetUShort(processedSubOperations)));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<ushort, ushort>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(short))
@@ -975,11 +975,11 @@ namespace Vectors
                         }
                         else if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<short, short>(count, blocks256, blocks128,
                                 (short)(left._vector.GetShort(processedSubOperations) +
                                          right._vector.GetShort(processedSubOperations)));
                         }
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<short, short>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(uint))
@@ -1092,12 +1092,12 @@ namespace Vectors
                         }
                         else if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<uint, uint>(count, blocks256, blocks128,
                                 left._vector.GetUInt(processedSubOperations) +
                                 right._vector.GetUInt(processedSubOperations));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<uint, uint>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(int))
@@ -1210,12 +1210,12 @@ namespace Vectors
                         }
                         else if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<int, int>(count, blocks256, blocks128,
                                 left._vector.GetInt(processedSubOperations) +
                                 right._vector.GetInt(processedSubOperations));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<int, int>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(ulong))
@@ -1286,12 +1286,12 @@ namespace Vectors
 
                         if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<ulong, ulong>(count, blocks256, blocks128,
                                 left._vector.GetULong(processedSubOperations) +
                                 right._vector.GetULong(processedSubOperations));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<ulong, ulong>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(long))
@@ -1362,12 +1362,12 @@ namespace Vectors
 
                         if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<long, long>(count, blocks256, blocks128,
                                 left._vector.GetLong(processedSubOperations) +
                                 right._vector.GetLong(processedSubOperations));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<long, long>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(float))
@@ -1483,12 +1483,12 @@ namespace Vectors
                         }
                         else if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<float, float>(count, blocks256, blocks128,
                                 left._vector.GetFloat(processedSubOperations) +
                                 right._vector.GetFloat(processedSubOperations));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<float, float>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(double))
@@ -1560,12 +1560,12 @@ namespace Vectors
 
                         if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<double, double>(count, blocks256, blocks128,
                                 left._vector.GetDouble(processedSubOperations) +
                                 right._vector.GetDouble(processedSubOperations));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<double, double>(count, blocks256, blocks128, value: null);
                 }
             }
             else
@@ -1758,12 +1758,12 @@ namespace Vectors
                         }
                         else if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<byte, byte>(count, blocks256, blocks128,
                                 (byte)(left._vector.GetByte(processedSubOperations) -
                                         right._vector.GetByte(processedSubOperations)));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<byte, byte>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(sbyte))
@@ -1946,12 +1946,12 @@ namespace Vectors
                         }
                         else if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<sbyte, sbyte>(count, blocks256, blocks128,
                                 (sbyte)(left._vector.GetSByte(processedSubOperations) -
                                          right._vector.GetSByte(processedSubOperations)));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<sbyte, sbyte>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(ushort))
@@ -2096,12 +2096,12 @@ namespace Vectors
                         }
                         else if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<ushort, ushort>(count, blocks256, blocks128,
                                 (ushort)(left._vector.GetUShort(processedSubOperations) -
                                          right._vector.GetUShort(processedSubOperations)));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<ushort, ushort>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(short))
@@ -2246,11 +2246,11 @@ namespace Vectors
                         }
                         else if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<short, short>(count, blocks256, blocks128,
                                 (short)(left._vector.GetShort(processedSubOperations) -
                                          right._vector.GetShort(processedSubOperations)));
                         }
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<short, short>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(uint))
@@ -2363,12 +2363,12 @@ namespace Vectors
                         }
                         else if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<uint, uint>(count, blocks256, blocks128,
                                 left._vector.GetUInt(processedSubOperations) -
                                 right._vector.GetUInt(processedSubOperations));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<uint, uint>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(int))
@@ -2481,12 +2481,12 @@ namespace Vectors
                         }
                         else if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<int, int>(count, blocks256, blocks128,
                                 left._vector.GetInt(processedSubOperations) -
                                 right._vector.GetInt(processedSubOperations));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<int, int>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(ulong))
@@ -2557,12 +2557,12 @@ namespace Vectors
 
                         if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<ulong, ulong>(count, blocks256, blocks128,
                                 left._vector.GetULong(processedSubOperations) -
                                 right._vector.GetULong(processedSubOperations));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<ulong, ulong>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(long))
@@ -2633,12 +2633,12 @@ namespace Vectors
 
                         if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<long, long>(count, blocks256, blocks128,
                                 left._vector.GetLong(processedSubOperations) -
                                 right._vector.GetLong(processedSubOperations));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<long, long>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(float))
@@ -2754,12 +2754,12 @@ namespace Vectors
                         }
                         else if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<float, float>(count, blocks256, blocks128,
                                 left._vector.GetFloat(processedSubOperations) -
                                 right._vector.GetFloat(processedSubOperations));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<float, float>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(double))
@@ -2831,12 +2831,12 @@ namespace Vectors
 
                         if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<double, double>(count, blocks256, blocks128,
                                 left._vector.GetDouble(processedSubOperations) -
                                 right._vector.GetDouble(processedSubOperations));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<double, double>(count, blocks256, blocks128, value: null);
                 }
             }
             else
@@ -2914,10 +2914,19 @@ namespace Vectors
                                                             right._vector.GetByte(arrayPosition));
                         }
 
-                        return Create(count, lower128, upperValues);
+                        return Create(count, lower128, upperValues);*/
                     case 16 when IntrinsicSupport.IsSse2Supported:
-                        return Create(count,
-                            Sse2.Multiply(left._vector.GetVector128Byte(0), right._vector.GetVector128Byte(0)));*/
+                        //From https://stackoverflow.com/a/29155682
+                        Vector128<ushort> leftShort = left._vector.GetVector128UShort(0);
+                        Vector128<ushort> rightShort = right._vector.GetVector128UShort(0);
+                        Vector128<ushort> evenResults = Sse2.MultiplyLow(leftShort, rightShort);
+                        //Can MultiplyHigh be used to optimise this?
+                        Vector128<ushort> oldResults = Sse2.MultiplyLow(Sse2.ShiftRightLogical(leftShort, 8),
+                            Sse2.ShiftRightLogical(rightShort, 8));
+                        Vector128<ushort> vector128 = Sse2.Or(Sse2.ShiftLeftLogical(oldResults, 8),
+                            Sse2.ShiftRightLogical(Sse2.ShiftLeftLogical(evenResults, 8), 8));
+
+                        return Create(count, vector128);
                     //TODO Support Vector64<T> on Arm
                     //TODO Is it worth extending Vector64<T>s to Vector128<T>s to use Sse2 on x86 since MMX is not supported?
                     /*case 8 when AdvSimd.IsSupported:
@@ -2926,7 +2935,7 @@ namespace Vectors
                         return Create((byte)(left._vector.GetByte(0) * right._vector.GetByte(0)));
                     default:
                         //Assumption is made that no Sse2 support means no Avx2 support
-                        //if (!IntrinsicSupport.IsSse2Supported)
+                        if (!IntrinsicSupport.IsSse2Supported)
                         {
                             byte[] values = new byte[count];
 
@@ -2938,13 +2947,13 @@ namespace Vectors
                             return Create(values);
                         }
 
-                        /*Vector128<byte>[] blocks128 = null;
-                        Vector256<byte>[] blocks256 = null;
+                        Vector128<ushort>[] blocks128 = null;
+                        Vector256<ushort>[] blocks256 = null;
 
                         int remainingSubOperations = count;
                         int processedSubOperations = 0;
 
-                        if (IntrinsicSupport.IsAvx2Supported && remainingSubOperations >= 32)
+                        /*if (IntrinsicSupport.IsAvx2Supported && remainingSubOperations >= 32)
                         {
                             //remainingSubOperations >> 5 = remainingSubOperations / 32
                             blocks256 = new Vector256<byte>[remainingSubOperations >> 5];
@@ -2957,17 +2966,24 @@ namespace Vectors
 
                             processedSubOperations = blocks256.Length << 5;
                             remainingSubOperations -= processedSubOperations;
-                        }
+                        }*/
 
                         if (remainingSubOperations >= 16)
                         {
                             //remainingSubOperations >> 4 = remainingSubOperations / 16
-                            blocks128 = new Vector128<byte>[remainingSubOperations >> 4];
+                            blocks128 = new Vector128<ushort>[remainingSubOperations >> 4];
 
                             for (int i = 0, j = processedSubOperations >> 4; i < blocks128.Length; i++, j++)
                             {
-                                blocks128[i] = Sse2.Multiply(left._vector.GetVector128Byte(j),
-                                    right._vector.GetVector128Byte(j));
+                                //From https://stackoverflow.com/a/29155682
+                                leftShort = left._vector.GetVector128UShort(j);
+                                rightShort = right._vector.GetVector128UShort(j);
+                                evenResults = Sse2.MultiplyLow(leftShort, rightShort);
+                                //Can MultiplyHigh be used to optimise this?
+                                oldResults = Sse2.MultiplyLow(Sse2.ShiftRightLogical(leftShort, 8),
+                                    Sse2.ShiftRightLogical(rightShort, 8));
+                                blocks128[i] = Sse2.Or(Sse2.ShiftLeftLogical(oldResults, 8),
+                                    Sse2.ShiftRightLogical(Sse2.ShiftLeftLogical(evenResults, 8), 8));
                             }
 
                             processedSubOperations += blocks128.Length << 4;
@@ -2977,7 +2993,7 @@ namespace Vectors
                         if (remainingSubOperations > 1)
                         {
                             byte[] values = new byte[remainingSubOperations];
-                            position = 0;
+                            int position = 0;
 
                             //TODO Figure out if this is any faster than the for loop that was here
                             if (remainingSubOperations >= 8)
@@ -3034,12 +3050,12 @@ namespace Vectors
                         }
                         else if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<byte, ushort>(count, blocks256, blocks128,
                                 (byte)(left._vector.GetByte(processedSubOperations) *
                                         right._vector.GetByte(processedSubOperations)));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);*/
+                        return Create<byte, ushort>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(sbyte))
@@ -4030,12 +4046,12 @@ namespace Vectors
                         }
                         else if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<float, float>(count, blocks256, blocks128,
                                 left._vector.GetFloat(processedSubOperations) *
                                 right._vector.GetFloat(processedSubOperations));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<float, float>(count, blocks256, blocks128, value: null);
                 }
             }
             else if (typeof(T) == typeof(double))
@@ -4107,12 +4123,12 @@ namespace Vectors
 
                         if (remainingSubOperations == 1)
                         {
-                            return Create(count, blocks256, blocks128,
+                            return Create<double, double>(count, blocks256, blocks128,
                                 left._vector.GetDouble(processedSubOperations) *
                                 right._vector.GetDouble(processedSubOperations));
                         }
 
-                        return Create(count, blocks256, blocks128, value: null);
+                        return Create<double, double>(count, blocks256, blocks128, value: null);
                 }
             }
             else
@@ -4516,7 +4532,7 @@ namespace Vectors
                 {
                     Vector256<byte> result = Avx2.CompareEqual(left._vector.GetVector256Byte(0),
                         right._vector.GetVector256Byte(0));
-                    if (unchecked((uint) Avx2.MoveMask(result)) != 0xFFFFFFFF)
+                    if (unchecked((uint)Avx2.MoveMask(result)) != 0xFFFFFFFF)
                     {
                         return false;
                     }

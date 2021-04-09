@@ -375,8 +375,10 @@ namespace Vectors
         //Creates a new Register that holds all the values from blocks256(optional) and then all values from
         //blocks128(optional) and then finally value(optional) goes on the end
         //Note that despite the fact that all parameters are optional, at least one must be given
-        internal static Register Create<T>(int count, Vector256<T>[] blocks256 = null, Vector128<T>[] blocks128 = null,
-            T? value = null) where T : struct
+        //This uses two separate generic types to get around multiplication intrinsics only supporting specific types 
+        //T is the type to use when creating the register, U is the type of the vector blocks and is irrelevant as the vectors will be cast
+        internal static Register Create<T, U>(int count, Vector256<U>[] blocks256 = null, Vector128<U>[] blocks128 = null,
+            T? value = null) where T : struct where U : struct
         {
             if (blocks256 == null && blocks128 == null && value == null)
             {
@@ -403,7 +405,7 @@ namespace Vectors
                 processed = (uint)blocks256.Length << BitShiftAmountIn256Bit<T>() << BitShiftHelpers.SizeOf<T>();
 
                 Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[0],
-                    ref Unsafe.As<Vector256<T>, byte>(ref blocks256[0]), processed);
+                    ref Unsafe.As<Vector256<U>, byte>(ref blocks256[0]), processed);
             }
 
             if (blocks128 != null)
@@ -411,7 +413,7 @@ namespace Vectors
                 uint count128 = (uint)blocks128.Length << BitShiftAmountIn128Bit<T>() << BitShiftHelpers.SizeOf<T>();
 
                 Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[processed],
-                    ref Unsafe.As<Vector128<T>, byte>(ref blocks128[0]), count128);
+                    ref Unsafe.As<Vector128<U>, byte>(ref blocks128[0]), count128);
 
                 processed += count128;
             }
@@ -427,10 +429,11 @@ namespace Vectors
         //TODO remove SizeOf<T>() and BitShiftHelpers.SizeOf<T>() and just ask caller for size of type?
         //Add(...) does have the relevant values and might soon have the values as variables
         //See comment on Vector128<U> Create function
+        //Also see comment on other vector block function about dual type use 
         //Constructs a new vector with all values from blocks256(optional) and then all values from blocks128(optional) and then finally value(optional) goes on the end
         //Note that despite the fact that all parameters are optional, at least one must be given
-        internal static Register Create<T>(int count, Vector256<T>[] blocks256 = null, Vector128<T>[] blocks128 = null,
-            T[] values = null) where T : struct
+        internal static Register Create<T, U>(int count, Vector256<U>[] blocks256 = null,
+            Vector128<U>[] blocks128 = null, T[] values = null) where T : struct where U : struct
         {
             if (blocks256 == null && blocks128 == null && values == null)
             {
@@ -457,7 +460,7 @@ namespace Vectors
                 processed = (uint)blocks256.Length << BitShiftAmountIn256Bit<T>() << BitShiftHelpers.SizeOf<T>();
 
                 Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[0],
-                    ref Unsafe.As<Vector256<T>, byte>(ref blocks256[0]), processed);
+                    ref Unsafe.As<Vector256<U>, byte>(ref blocks256[0]), processed);
             }
 
             if (blocks128 != null)
@@ -465,7 +468,7 @@ namespace Vectors
                 uint count128 = (uint)blocks128.Length << BitShiftAmountIn128Bit<T>() << BitShiftHelpers.SizeOf<T>();
 
                 Unsafe.CopyBlockUnaligned(ref register.pUInt8Values[processed],
-                    ref Unsafe.As<Vector128<T>, byte>(ref blocks128[0]), count128);
+                    ref Unsafe.As<Vector128<U>, byte>(ref blocks128[0]), count128);
 
                 processed += count128;
             }
