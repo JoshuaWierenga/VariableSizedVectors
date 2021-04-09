@@ -617,6 +617,7 @@ namespace Vectors
             }
         }
 
+        //TODO Fix, this does not handle constant values
         //Only gives an array of the right size if T is the original type used in one of the Create function
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal ReadOnlySpan<T> GetValues<T>() => new(pUInt8Values, Length);
