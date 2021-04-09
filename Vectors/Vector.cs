@@ -287,6 +287,8 @@ namespace Vectors
 
         //Operators
         //TODO Find way to merge branches since other than types, they all contain the same code
+        //If this cannot be done without a performance impact then use code generation to at least reduce the risk that
+        //the code for different types and operations becoming out of sync.
         //TODO Ensure type constants are set correctly, is it worth making the constants a variable for each type?
         //There are functions in Register<T> to calculate them but that feels unnecessary since those are for generic cases
         //This method performs addition on the vectors left and right.
@@ -2845,126 +2847,1277 @@ namespace Vectors
 
         //TODO Add Dot/Transposed Multiplication, Cross?
         //Element Wise Multiplication
+        //TODO fix issues with (s)byte, (u)short, (u)int and (u)long multiplication for sse(2) and avx(2), https://stackoverflow.com/a/29155682?
+        //TODO Deal with x86 .Multiply functions for (u)ints returning (u)longs and only the low two at that
+        //is _mm256_mullo_ep* suitable and supported in c#? Only 16 and 32 bit variants are relevant as the 64 bit version requires avx512
         public static Vector<T> operator *(Vector<T> left, Vector<T> right)
         {
-            int size;
+            int count = GetSize(left, right);
 
-            if (left._vector.Constant)
+            if (typeof(T) == typeof(byte))
             {
-                size = right._vector.Length;
+                switch (count)
+                {
+                    /*case 32 when IntrinsicSupport.IsAvx2Supported:
+                        return Create(count,
+                            Avx2.Multiply(left._vector.GetVector256Byte(0), right._vector.GetVector256Byte(0)));
+                    case < 32 and > 16 when IntrinsicSupport.IsSse2Supported:
+                        Vector128<byte> lower128 = Sse2.Multiply(left._vector.GetVector128Byte(0),
+                            right._vector.GetVector128Byte(0));
+
+                        byte[] upperValues = new byte[count - 16];
+                        int remaining = upperValues.Length;
+                        int position = 0;
+                        int arrayPosition = 16;
+
+                        //TODO Figure out if this is any faster than the for loop that was here
+                        if (remaining >= 8)
+                        {
+                            upperValues[0] = (byte)(left._vector.GetByte(16) * right._vector.GetByte(16));
+                            upperValues[1] = (byte)(left._vector.GetByte(17) * right._vector.GetByte(17));
+                            upperValues[2] = (byte)(left._vector.GetByte(18) * right._vector.GetByte(18));
+                            upperValues[3] = (byte)(left._vector.GetByte(19) * right._vector.GetByte(19));
+                            upperValues[4] = (byte)(left._vector.GetByte(20) * right._vector.GetByte(20));
+                            upperValues[5] = (byte)(left._vector.GetByte(21) * right._vector.GetByte(21));
+                            upperValues[6] = (byte)(left._vector.GetByte(22) * right._vector.GetByte(22));
+                            upperValues[8] = (byte)(left._vector.GetByte(23) * right._vector.GetByte(23));
+                            position = 8;
+                            remaining -= 8;
+                            arrayPosition = 24;
+                        }
+
+                        if (remaining >= 4)
+                        {
+                            upperValues[position++] = (byte)(left._vector.GetByte(arrayPosition) *
+                                                              right._vector.GetByte(arrayPosition++));
+                            upperValues[position++] = (byte)(left._vector.GetByte(arrayPosition) *
+                                                              right._vector.GetByte(arrayPosition++));
+                            upperValues[position++] = (byte)(left._vector.GetByte(arrayPosition) *
+                                                              right._vector.GetByte(arrayPosition++));
+                            upperValues[position++] = (byte)(left._vector.GetByte(arrayPosition) *
+                                                              right._vector.GetByte(arrayPosition++));
+                            remaining -= 4;
+                        }
+
+                        if (remaining >= 2)
+                        {
+                            upperValues[position++] = (byte)(left._vector.GetByte(arrayPosition) *
+                                                              right._vector.GetByte(arrayPosition++));
+                            upperValues[position++] = (byte)(left._vector.GetByte(arrayPosition) *
+                                                              right._vector.GetByte(arrayPosition++));
+                            remaining -= 2;
+                        }
+
+                        if (remaining == 1)
+                        {
+                            upperValues[position] = (byte)(left._vector.GetByte(arrayPosition) *
+                                                            right._vector.GetByte(arrayPosition));
+                        }
+
+                        return Create(count, lower128, upperValues);
+                    case 16 when IntrinsicSupport.IsSse2Supported:
+                        return Create(count,
+                            Sse2.Multiply(left._vector.GetVector128Byte(0), right._vector.GetVector128Byte(0)));*/
+                    //TODO Support Vector64<T> on Arm
+                    //TODO Is it worth extending Vector64<T>s to Vector128<T>s to use Sse2 on x86 since MMX is not supported?
+                    /*case 8 when AdvSimd.IsSupported:
+                        break;*/
+                    case 1:
+                        return Create((byte)(left._vector.GetByte(0) * right._vector.GetByte(0)));
+                    default:
+                        //Assumption is made that no Sse2 support means no Avx2 support
+                        //if (!IntrinsicSupport.IsSse2Supported)
+                        {
+                            byte[] values = new byte[count];
+
+                            for (int i = 0; i < values.Length; i++)
+                            {
+                                values[i] = (byte)(left._vector.GetByte(i) * right._vector.GetByte(i));
+                            }
+
+                            return Create(values);
+                        }
+
+                        /*Vector128<byte>[] blocks128 = null;
+                        Vector256<byte>[] blocks256 = null;
+
+                        int remainingSubOperations = count;
+                        int processedSubOperations = 0;
+
+                        if (IntrinsicSupport.IsAvx2Supported && remainingSubOperations >= 32)
+                        {
+                            //remainingSubOperations >> 5 = remainingSubOperations / 32
+                            blocks256 = new Vector256<byte>[remainingSubOperations >> 5];
+
+                            for (int i = 0; i < blocks256.Length; i++)
+                            {
+                                blocks256[i] = Avx2.Multiply(left._vector.GetVector256Byte(i),
+                                    right._vector.GetVector256Byte(i));
+                            }
+
+                            processedSubOperations = blocks256.Length << 5;
+                            remainingSubOperations -= processedSubOperations;
+                        }
+
+                        if (remainingSubOperations >= 16)
+                        {
+                            //remainingSubOperations >> 4 = remainingSubOperations / 16
+                            blocks128 = new Vector128<byte>[remainingSubOperations >> 4];
+
+                            for (int i = 0, j = processedSubOperations >> 4; i < blocks128.Length; i++, j++)
+                            {
+                                blocks128[i] = Sse2.Multiply(left._vector.GetVector128Byte(j),
+                                    right._vector.GetVector128Byte(j));
+                            }
+
+                            processedSubOperations += blocks128.Length << 4;
+                            remainingSubOperations -= blocks128.Length << 4;
+                        }
+
+                        if (remainingSubOperations > 1)
+                        {
+                            byte[] values = new byte[remainingSubOperations];
+                            position = 0;
+
+                            //TODO Figure out if this is any faster than the for loop that was here
+                            if (remainingSubOperations >= 8)
+                            {
+                                values[0] = (byte)(left._vector.GetByte(processedSubOperations) *
+                                                    right._vector.GetByte(processedSubOperations++));
+                                values[1] = (byte)(left._vector.GetByte(processedSubOperations) *
+                                                    right._vector.GetByte(processedSubOperations++));
+                                values[2] = (byte)(left._vector.GetByte(processedSubOperations) *
+                                                    right._vector.GetByte(processedSubOperations++));
+                                values[3] = (byte)(left._vector.GetByte(processedSubOperations) *
+                                                    right._vector.GetByte(processedSubOperations++));
+                                values[4] = (byte)(left._vector.GetByte(processedSubOperations) *
+                                                    right._vector.GetByte(processedSubOperations++));
+                                values[5] = (byte)(left._vector.GetByte(processedSubOperations) *
+                                                    right._vector.GetByte(processedSubOperations++));
+                                values[6] = (byte)(left._vector.GetByte(processedSubOperations) *
+                                                    right._vector.GetByte(processedSubOperations++));
+                                values[7] = (byte)(left._vector.GetByte(processedSubOperations) *
+                                                    right._vector.GetByte(processedSubOperations++));
+                                position = 8;
+                                remainingSubOperations -= 8;
+                            }
+
+                            if (remainingSubOperations >= 4)
+                            {
+                                values[position++] = (byte)(left._vector.GetByte(processedSubOperations) *
+                                                                  right._vector.GetByte(processedSubOperations++));
+                                values[position++] = (byte)(left._vector.GetByte(processedSubOperations) *
+                                                                  right._vector.GetByte(processedSubOperations++));
+                                values[position++] = (byte)(left._vector.GetByte(processedSubOperations) *
+                                                                  right._vector.GetByte(processedSubOperations++));
+                                values[position++] = (byte)(left._vector.GetByte(processedSubOperations) *
+                                                                  right._vector.GetByte(processedSubOperations++));
+                                remainingSubOperations -= 4;
+                            }
+
+                            if (remainingSubOperations >= 2)
+                            {
+                                values[position++] = (byte)(left._vector.GetByte(processedSubOperations) *
+                                                                  right._vector.GetByte(processedSubOperations++));
+                                values[position++] = (byte)(left._vector.GetByte(processedSubOperations) *
+                                                                  right._vector.GetByte(processedSubOperations++));
+                                remainingSubOperations -= 2;
+                            }
+
+                            if (remainingSubOperations == 1)
+                            {
+                                values[position] = (byte)(left._vector.GetByte(processedSubOperations) *
+                                                                right._vector.GetByte(processedSubOperations));
+                            }
+
+                            return Create(count, blocks256, blocks128, values);
+                        }
+                        else if (remainingSubOperations == 1)
+                        {
+                            return Create(count, blocks256, blocks128,
+                                (byte)(left._vector.GetByte(processedSubOperations) *
+                                        right._vector.GetByte(processedSubOperations)));
+                        }
+
+                        return Create(count, blocks256, blocks128, value: null);*/
+                }
             }
-            else if (right._vector.Constant)
+            else if (typeof(T) == typeof(sbyte))
             {
-                size = left._vector.Length;
+                switch (count)
+                {
+                    /*case 32 when IntrinsicSupport.IsAvx2Supported:
+                        return Create(count,
+                            Avx2.Multiply(left._vector.GetVector256SByte(0), right._vector.GetVector256SByte(0)));
+                    case < 32 and > 16 when IntrinsicSupport.IsSse2Supported:
+                        Vector128<sbyte> lower128 = Sse2.Multiply(left._vector.GetVector128SByte(0),
+                            right._vector.GetVector128SByte(0));
+
+                        sbyte[] upperValues = new sbyte[count - 16];
+                        int remaining = upperValues.Length;
+                        int position = 0;
+                        int arrayPosition = 16;
+
+                        //TODO Figure out if this is any faster than the for loop that was here
+                        if (remaining >= 8)
+                        {
+                            upperValues[0] = (sbyte)(left._vector.GetSByte(16) * right._vector.GetSByte(16));
+                            upperValues[1] = (sbyte)(left._vector.GetSByte(17) * right._vector.GetSByte(17));
+                            upperValues[2] = (sbyte)(left._vector.GetSByte(18) * right._vector.GetSByte(18));
+                            upperValues[3] = (sbyte)(left._vector.GetSByte(19) * right._vector.GetSByte(19));
+                            upperValues[4] = (sbyte)(left._vector.GetSByte(20) * right._vector.GetSByte(20));
+                            upperValues[5] = (sbyte)(left._vector.GetSByte(21) * right._vector.GetSByte(21));
+                            upperValues[6] = (sbyte)(left._vector.GetSByte(22) * right._vector.GetSByte(22));
+                            upperValues[8] = (sbyte)(left._vector.GetSByte(23) * right._vector.GetSByte(23));
+                            position = 8;
+                            remaining -= 8;
+                            arrayPosition = 24;
+                        }
+
+                        if (remaining >= 4)
+                        {
+                            upperValues[position++] = (sbyte)(left._vector.GetSByte(arrayPosition) *
+                                                              right._vector.GetSByte(arrayPosition++));
+                            upperValues[position++] = (sbyte)(left._vector.GetSByte(arrayPosition) *
+                                                              right._vector.GetSByte(arrayPosition++));
+                            upperValues[position++] = (sbyte)(left._vector.GetSByte(arrayPosition) *
+                                                              right._vector.GetSByte(arrayPosition++));
+                            upperValues[position++] = (sbyte)(left._vector.GetSByte(arrayPosition) *
+                                                              right._vector.GetSByte(arrayPosition++));
+                            remaining -= 4;
+                        }
+
+                        if (remaining >= 2)
+                        {
+                            upperValues[position++] = (sbyte)(left._vector.GetSByte(arrayPosition) *
+                                                              right._vector.GetSByte(arrayPosition++));
+                            upperValues[position++] = (sbyte)(left._vector.GetSByte(arrayPosition) *
+                                                              right._vector.GetSByte(arrayPosition++));
+                            remaining -= 2;
+                        }
+
+                        if (remaining == 1)
+                        {
+                            upperValues[position] = (sbyte)(left._vector.GetSByte(arrayPosition) *
+                                                            right._vector.GetSByte(arrayPosition));
+                        }
+
+                        return Create(count, lower128, upperValues);
+                    case 16 when IntrinsicSupport.IsSse2Supported:
+                        return Create(count,
+                            Sse2.Multiply(left._vector.GetVector128Short(0), right._vector.GetVector128Short(0)));*/
+                    //TODO Support Vector64<T> on Arm
+                    //TODO Is it worth extending Vector64<T>s to Vector128<T>s to use Sse2 on x86 since MMX is not supported?
+                    /*case 8 when AdvSimd.IsSupported:
+                        break;*/
+                    case 1:
+                        return Create((sbyte)(left._vector.GetSByte(0) * right._vector.GetSByte(0)));
+                    default:
+                        //Assumption is made that no Sse2 support means no Avx2 support
+                        //if (!IntrinsicSupport.IsSse2Supported)
+                        {
+                            sbyte[] values = new sbyte[count];
+
+                            for (int i = 0; i < values.Length; i++)
+                            {
+                                values[i] = (sbyte)(left._vector.GetSByte(i) * right._vector.GetSByte(i));
+                            }
+
+                            return Create(values);
+                        }
+
+                        /*Vector128<sbyte>[] blocks128 = null;
+                        Vector256<sbyte>[] blocks256 = null;
+
+                        int remainingSubOperations = count;
+                        int processedSubOperations = 0;
+
+                        if (IntrinsicSupport.IsAvx2Supported && remainingSubOperations >= 32)
+                        {
+                            //remainingSubOperations >> 5 = remainingSubOperations / 32
+                            blocks256 = new Vector256<sbyte>[remainingSubOperations >> 5];
+
+                            for (int i = 0; i < blocks256.Length; i++)
+                            {
+                                blocks256[i] = Avx2.Multiply(left._vector.GetVector256SByte(i),
+                                    right._vector.GetVector256SByte(i));
+                            }
+
+                            processedSubOperations = blocks256.Length << 5;
+                            remainingSubOperations -= processedSubOperations;
+                        }
+
+                        if (remainingSubOperations >= 16)
+                        {
+                            //remainingSubOperations >> 4 = remainingSubOperations / 16
+                            blocks128 = new Vector128<sbyte>[remainingSubOperations >> 4];
+
+                            for (int i = 0, j = processedSubOperations >> 4; i < blocks128.Length; i++, j++)
+                            {
+                                blocks128[i] = Sse2.Multiply(left._vector.GetVector128SByte(j),
+                                    right._vector.GetVector128SByte(j));
+                            }
+
+                            processedSubOperations += blocks128.Length << 4;
+                            remainingSubOperations -= blocks128.Length << 4;
+                        }
+
+                        if (remainingSubOperations > 1)
+                        {
+                            sbyte[] values = new sbyte[remainingSubOperations];
+                            position = 0;
+
+                            //TODO Figure out if this is any faster than the for loop that was here
+                            if (remainingSubOperations >= 8)
+                            {
+                                values[0] = (sbyte)(left._vector.GetSByte(processedSubOperations) *
+                                                    right._vector.GetSByte(processedSubOperations++));
+                                values[1] = (sbyte)(left._vector.GetSByte(processedSubOperations) *
+                                                    right._vector.GetSByte(processedSubOperations++));
+                                values[2] = (sbyte)(left._vector.GetSByte(processedSubOperations) *
+                                                    right._vector.GetSByte(processedSubOperations++));
+                                values[3] = (sbyte)(left._vector.GetSByte(processedSubOperations) *
+                                                    right._vector.GetSByte(processedSubOperations++));
+                                values[4] = (sbyte)(left._vector.GetSByte(processedSubOperations) *
+                                                    right._vector.GetSByte(processedSubOperations++));
+                                values[5] = (sbyte)(left._vector.GetSByte(processedSubOperations) *
+                                                    right._vector.GetSByte(processedSubOperations++));
+                                values[6] = (sbyte)(left._vector.GetSByte(processedSubOperations) *
+                                                    right._vector.GetSByte(processedSubOperations++));
+                                values[7] = (sbyte)(left._vector.GetSByte(processedSubOperations) *
+                                                    right._vector.GetSByte(processedSubOperations++));
+                                position = 8;
+                                remainingSubOperations -= 8;
+                            }
+
+                            if (remainingSubOperations >= 4)
+                            {
+                                values[position++] = (sbyte)(left._vector.GetSByte(processedSubOperations) *
+                                                                  right._vector.GetSByte(processedSubOperations++));
+                                values[position++] = (sbyte)(left._vector.GetSByte(processedSubOperations) *
+                                                                  right._vector.GetSByte(processedSubOperations++));
+                                values[position++] = (sbyte)(left._vector.GetSByte(processedSubOperations) *
+                                                                  right._vector.GetSByte(processedSubOperations++));
+                                values[position++] = (sbyte)(left._vector.GetSByte(processedSubOperations) *
+                                                                  right._vector.GetSByte(processedSubOperations++));
+                                remainingSubOperations -= 4;
+                            }
+
+                            if (remainingSubOperations >= 2)
+                            {
+                                values[position++] = (sbyte)(left._vector.GetSByte(processedSubOperations) *
+                                                                  right._vector.GetSByte(processedSubOperations++));
+                                values[position++] = (sbyte)(left._vector.GetSByte(processedSubOperations) *
+                                                                  right._vector.GetSByte(processedSubOperations++));
+                                remainingSubOperations -= 2;
+                            }
+
+                            if (remainingSubOperations == 1)
+                            {
+                                values[position] = (sbyte)(left._vector.GetSByte(processedSubOperations) *
+                                                                right._vector.GetSByte(processedSubOperations));
+                            }
+
+                            return Create(count, blocks256, blocks128, values);
+                        }
+                        else if (remainingSubOperations == 1)
+                        {
+                            return Create(count, blocks256, blocks128,
+                                (sbyte)(left._vector.GetSByte(processedSubOperations) *
+                                         right._vector.GetSByte(processedSubOperations)));
+                        }
+
+                        return Create(count, blocks256, blocks128, value: null);*/
+                }
             }
-            else if (left._vector.Length != right._vector.Length)
+            else if (typeof(T) == typeof(ushort))
             {
-                throw new IndexOutOfRangeException();
+                switch (count)
+                {
+                    /*case 16 when IntrinsicSupport.IsAvx2Supported:
+                        return Create(count,
+                            Avx2.Multiply(left._vector.GetVector256UShort(0), right._vector.GetVector256UShort(0)));
+                    case < 16 and > 8 when IntrinsicSupport.IsSse2Supported:
+                        Vector128<ushort> lower128 = Sse2.Multiply(left._vector.GetVector128UShort(0),
+                            right._vector.GetVector128UShort(0));
+
+                        ushort[] upperValues = new ushort[count - 8];
+                        int remaining = upperValues.Length;
+                        int position = 0;
+                        int arrayPosition = 8;
+
+                        //TODO Figure out if this is any faster than the for loop that was here
+                        if (remaining >= 4)
+                        {
+                            upperValues[0] = (ushort)(left._vector.GetUShort(8) * right._vector.GetUShort(8));
+                            upperValues[1] = (ushort)(left._vector.GetUShort(9) * right._vector.GetUShort(9));
+                            upperValues[2] = (ushort)(left._vector.GetUShort(10) * right._vector.GetUShort(10));
+                            upperValues[3] = (ushort)(left._vector.GetUShort(11) * right._vector.GetUShort(11));
+                            position = 4;
+                            remaining -= 4;
+                            arrayPosition = 12;
+                        }
+
+                        if (remaining >= 2)
+                        {
+                            upperValues[position++] = (ushort)(left._vector.GetUShort(arrayPosition) *
+                                                              right._vector.GetUShort(arrayPosition++));
+                            upperValues[position++] = (ushort)(left._vector.GetUShort(arrayPosition) *
+                                                              right._vector.GetUShort(arrayPosition++));
+                            remaining -= 2;
+                        }
+
+                        if (remaining == 1)
+                        {
+                            upperValues[position] = (ushort)(left._vector.GetUShort(arrayPosition) *
+                                                            right._vector.GetUShort(arrayPosition));
+                        }
+
+                        return Create(count, lower128, upperValues);
+                    case 8 when IntrinsicSupport.IsSse2Supported:
+                        return Create(count,
+                            Sse2.Multiply(left._vector.GetVector128UShort(0), right._vector.GetVector128UShort(0)));*/
+                    //TODO Support Vector64<T> on Arm
+                    //TODO Is it worth extending Vector64<T>s to Vector128<T>s to use Sse2 on x86 since MMX is not supported?
+                    /*case 4 when AdvSimd.IsSupported:
+                        break;*/
+                    case 1:
+                        return Create((ushort)(left._vector.GetUShort(0) * right._vector.GetUShort(0)));
+                    default:
+                        //Assumption is made that no Sse2 support means no Avx2 support
+                        //if (!IntrinsicSupport.IsSse2Supported)
+                        {
+                            ushort[] values = new ushort[count];
+
+                            for (int i = 0; i < values.Length; i++)
+                            {
+                                values[i] = (ushort)(left._vector.GetUShort(i) * right._vector.GetUShort(i));
+                            }
+
+                            return Create(values);
+                        }
+
+                        /*Vector128<ushort>[] blocks128 = null;
+                        Vector256<ushort>[] blocks256 = null;
+
+                        int remainingSubOperations = count;
+                        int processedSubOperations = 0;
+
+                        if (IntrinsicSupport.IsAvx2Supported && remainingSubOperations >= 16)
+                        {
+                            //remainingSubOperations >> 4 = remainingSubOperations / 16
+                            blocks256 = new Vector256<ushort>[remainingSubOperations >> 4];
+
+                            for (int i = 0; i < blocks256.Length; i++)
+                            {
+                                blocks256[i] = Avx2.Multiply(left._vector.GetVector256UShort(i),
+                                    right._vector.GetVector256UShort(i));
+                            }
+
+                            processedSubOperations = blocks256.Length << 4;
+                            remainingSubOperations -= processedSubOperations;
+                        }
+
+                        if (remainingSubOperations >= 8)
+                        {
+                            //remainingSubOperations >> 3 = remainingSubOperations / 8
+                            blocks128 = new Vector128<ushort>[remainingSubOperations >> 3];
+
+                            for (int i = 0, j = processedSubOperations >> 3; i < blocks128.Length; i++, j++)
+                            {
+                                blocks128[i] = Sse2.Multiply(left._vector.GetVector128UShort(j),
+                                    right._vector.GetVector128UShort(j));
+                            }
+
+                            processedSubOperations += blocks128.Length << 3;
+                            remainingSubOperations -= blocks128.Length << 3;
+                        }
+
+                        if (remainingSubOperations > 1)
+                        {
+                            ushort[] values = new ushort[remainingSubOperations];
+                            position = 0;
+
+                            //TODO Figure out if this is any faster than the for loop that was here
+                            if (remainingSubOperations >= 4)
+                            {
+                                values[0] = (ushort)(left._vector.GetUShort(processedSubOperations) *
+                                                                  right._vector.GetUShort(processedSubOperations++));
+                                values[1] = (ushort)(left._vector.GetUShort(processedSubOperations) *
+                                                                  right._vector.GetUShort(processedSubOperations++));
+                                values[2] = (ushort)(left._vector.GetUShort(processedSubOperations) *
+                                                                  right._vector.GetUShort(processedSubOperations++));
+                                values[3] = (ushort)(left._vector.GetUShort(processedSubOperations) *
+                                                                  right._vector.GetUShort(processedSubOperations++));
+                                position = 4;
+                                remainingSubOperations -= 4;
+                            }
+
+                            if (remainingSubOperations >= 2)
+                            {
+                                values[position++] = (ushort)(left._vector.GetUShort(processedSubOperations) *
+                                                                  right._vector.GetUShort(processedSubOperations++));
+                                values[position++] = (ushort)(left._vector.GetUShort(processedSubOperations) *
+                                                                  right._vector.GetUShort(processedSubOperations++));
+                                remainingSubOperations -= 2;
+                            }
+
+                            if (remainingSubOperations == 1)
+                            {
+                                values[position] = (ushort)(left._vector.GetUShort(processedSubOperations) *
+                                                                right._vector.GetUShort(processedSubOperations));
+                            }
+
+                            return Create(count, blocks256, blocks128, values);
+                        }
+                        else if (remainingSubOperations == 1)
+                        {
+                            return Create(count, blocks256, blocks128,
+                                (ushort)(left._vector.GetUShort(processedSubOperations) *
+                                         right._vector.GetUShort(processedSubOperations)));
+                        }
+
+                        return Create(count, blocks256, blocks128, value: null);*/
+                }
+            }
+            else if (typeof(T) == typeof(short))
+            {
+                switch (count)
+                {
+                    /*case 16 when IntrinsicSupport.IsAvx2Supported:
+                        return Create(count,
+                            Avx2.Multiply(left._vector.GetVector256Short(0), right._vector.GetVector256Short(0)));
+                    case < 16 and > 8 when IntrinsicSupport.IsSse2Supported:
+                        Vector128<short> lower128 = Sse2.Multiply(left._vector.GetVector128Short(0),
+                            right._vector.GetVector128Short(0));
+
+                        short[] upperValues = new short[count - 8];
+                        int remaining = upperValues.Length;
+                        int position = 0;
+                        int arrayPosition = 8;
+
+                        //TODO Figure out if this is any faster than the for loop that was here
+                        if (remaining >= 4)
+                        {
+                            upperValues[0] = (short)(left._vector.GetShort(8) * right._vector.GetShort(8));
+                            upperValues[1] = (short)(left._vector.GetShort(9) * right._vector.GetShort(9));
+                            upperValues[2] = (short)(left._vector.GetShort(10) * right._vector.GetShort(10));
+                            upperValues[3] = (short)(left._vector.GetShort(11) * right._vector.GetShort(11));
+                            position = 4;
+                            remaining -= 4;
+                            arrayPosition = 12;
+                        }
+
+                        if (remaining >= 2)
+                        {
+                            upperValues[position++] = (short)(left._vector.GetShort(arrayPosition) *
+                                                               right._vector.GetShort(arrayPosition++));
+                            upperValues[position++] = (short)(left._vector.GetShort(arrayPosition) *
+                                                               right._vector.GetShort(arrayPosition++));
+                            remaining -= 2;
+                        }
+
+                        if (remaining == 1)
+                        {
+                            upperValues[position] = (short)(left._vector.GetShort(arrayPosition) *
+                                                             right._vector.GetShort(arrayPosition));
+                        }
+
+                        return Create(count, lower128, upperValues);
+                    case 8 when IntrinsicSupport.IsSse2Supported:
+                        return Create(count,
+                            Sse2.Multiply(left._vector.GetVector128Short(0), right._vector.GetVector128Short(0)));*/
+                    //TODO Support Vector64<T> on Arm
+                    //TODO Is it worth extending Vector64<T>s to Vector128<T>s to use Sse2 on x86 since MMX is not supported?
+                    /*case 4 when AdvSimd.IsSupported:
+                        break;*/
+                    case 1:
+                        return Create((short)(left._vector.GetShort(0) * right._vector.GetShort(0)));
+                    default:
+                        //Assumption is made that no Sse2 support means no Avx2 support
+                        //if (!IntrinsicSupport.IsSse2Supported)
+                        {
+                            short[] values = new short[count];
+
+                            for (int i = 0; i < values.Length; i++)
+                            {
+                                values[i] = (short)(left._vector.GetShort(i) * right._vector.GetShort(i));
+                            }
+
+                            return Create(values);
+                        }
+
+                        /*Vector128<short>[] blocks128 = null;
+                        Vector256<short>[] blocks256 = null;
+
+                        int remainingSubOperations = count;
+                        int processedSubOperations = 0;
+
+                        if (IntrinsicSupport.IsAvx2Supported && remainingSubOperations >= 16)
+                        {
+                            //remainingSubOperations >> 4 = remainingSubOperations / 16
+                            blocks256 = new Vector256<short>[remainingSubOperations >> 4];
+
+                            for (int i = 0; i < blocks256.Length; i++)
+                            {
+                                blocks256[i] = Avx2.Multiply(left._vector.GetVector256Short(i),
+                                    right._vector.GetVector256Short(i));
+                            }
+
+                            processedSubOperations = blocks256.Length << 4;
+                            remainingSubOperations -= processedSubOperations;
+                        }
+
+                        if (remainingSubOperations >= 8)
+                        {
+                            //remainingSubOperations >> 3 = remainingSubOperations / 8
+                            blocks128 = new Vector128<short>[remainingSubOperations >> 3];
+
+                            for (int i = 0, j = processedSubOperations >> 3; i < blocks128.Length; i++, j++)
+                            {
+                                blocks128[i] = Sse2.Multiply(left._vector.GetVector128Short(j),
+                                    right._vector.GetVector128Short(j));
+                            }
+
+                            processedSubOperations += blocks128.Length << 3;
+                            remainingSubOperations -= blocks128.Length << 3;
+                        }
+
+                        if (remainingSubOperations > 1)
+                        {
+                            short[] values = new short[remainingSubOperations];
+                            position = 0;
+
+                            //TODO Figure out if this is any faster than the for loop that was here
+                            if (remainingSubOperations >= 4)
+                            {
+                                values[0] = (short)(left._vector.GetShort(processedSubOperations) *
+                                                                  right._vector.GetShort(processedSubOperations++));
+                                values[1] = (short)(left._vector.GetShort(processedSubOperations) *
+                                                                  right._vector.GetShort(processedSubOperations++));
+                                values[2] = (short)(left._vector.GetShort(processedSubOperations) *
+                                                                  right._vector.GetShort(processedSubOperations++));
+                                values[3] = (short)(left._vector.GetShort(processedSubOperations) *
+                                                                  right._vector.GetShort(processedSubOperations++));
+                                position = 4;
+                                remainingSubOperations -= 4;
+                            }
+
+                            if (remainingSubOperations >= 2)
+                            {
+                                values[position++] = (short)(left._vector.GetShort(processedSubOperations) *
+                                                                  right._vector.GetShort(processedSubOperations++));
+                                values[position++] = (short)(left._vector.GetShort(processedSubOperations) *
+                                                                  right._vector.GetShort(processedSubOperations++));
+                                remainingSubOperations -= 2;
+                            }
+
+                            if (remainingSubOperations == 1)
+                            {
+                                values[position] = (short)(left._vector.GetShort(processedSubOperations) *
+                                                                right._vector.GetShort(processedSubOperations));
+                            }
+
+                            return Create(count, blocks256, blocks128, values);
+                        }
+                        else if (remainingSubOperations == 1)
+                        {
+                            return Create(count, blocks256, blocks128,
+                                (short)(left._vector.GetShort(processedSubOperations) *
+                                         right._vector.GetShort(processedSubOperations)));
+                        }
+                        return Create(count, blocks256, blocks128, value: null);*/
+                }
+            }
+            else if (typeof(T) == typeof(uint))
+            {
+                switch (count)
+                {
+                    /*case 8 when IntrinsicSupport.IsAvx2Supported:
+                        return Create(count,
+                            Avx2.Multiply(left._vector.GetVector256UInt(0), right._vector.GetVector256UInt(0)));
+                    case < 8 and > 4 when IntrinsicSupport.IsSse2Supported:
+                        Vector128<uint> lower128 = Sse2.Multiply(left._vector.GetVector128UInt(0),
+                            right._vector.GetVector128UInt(0));
+
+                        uint[] upperValues = new uint[count - 4];
+                        int remaining = upperValues.Length;
+                        int position = 0;
+                        int arrayPosition = 4;
+
+                        if (remaining >= 2)
+                        {
+                            upperValues[0] = left._vector.GetUInt(4) * right._vector.GetUInt(4);
+                            upperValues[1] = left._vector.GetUInt(5) * right._vector.GetUInt(5);
+                            position = 2;
+                            remaining -= 2;
+                            arrayPosition = 6;
+                        }
+
+                        if (remaining == 1)
+                        {
+                            upperValues[position] = left._vector.GetUInt(arrayPosition) *
+                                                    right._vector.GetUInt(arrayPosition);
+                        }
+
+                        return Create(count, lower128, upperValues);*/
+                    case 4 when IntrinsicSupport.IsSse2Supported:
+                        return Create(count,
+                            Sse2.Multiply(left._vector.GetVector128UInt(0), right._vector.GetVector128UInt(0)));
+                    //TODO Support Vector64<T> on Arm
+                    //TODO Is it worth extending Vector64<T>s to Vector128<T>s to use Sse2 on x86 since MMX is not supported?
+                    /*case 2 when AdvSimd.IsSupported:
+                        break;*/
+                    case 1:
+                        return Create(left._vector.GetUInt(0) * right._vector.GetUInt(0));
+                    default:
+                        //Assumption is made that no Sse2 support means no Avx2 support
+                        //if (!IntrinsicSupport.IsSse2Supported)
+                        {
+                            uint[] values = new uint[count];
+
+                            for (int i = 0; i < values.Length; i++)
+                            {
+                                values[i] = left._vector.GetUInt(i) * right._vector.GetUInt(i);
+                            }
+
+                            return Create(values);
+                        }
+
+                        /*Vector128<uint>[] blocks128 = null;
+                        Vector256<uint>[] blocks256 = null;
+
+                        int remainingSubOperations = count;
+                        int processedSubOperations = 0;
+
+                        if (IntrinsicSupport.IsAvx2Supported && remainingSubOperations >= 8)
+                        {
+                            //remainingSubOperations >> 3 = remainingSubOperations / 8
+                            blocks256 = new Vector256<uint>[remainingSubOperations >> 3];
+
+                            for (int i = 0; i < blocks256.Length; i++)
+                            {
+                                blocks256[i] = Avx2.Multiply(left._vector.GetVector256UInt(i),
+                                    right._vector.GetVector256UInt(i));
+                            }
+
+                            processedSubOperations = blocks256.Length << 3;
+                            remainingSubOperations -= processedSubOperations;
+                        }
+
+                        if (remainingSubOperations >= 4)
+                        {
+                            //remainingSubOperations >> 2 = remainingSubOperations / 4
+                            blocks128 = new Vector128<uint>[remainingSubOperations >> 2];
+
+                            for (int i = 0, j = processedSubOperations >> 2; i < blocks128.Length; i++, j++)
+                            {
+                                blocks128[i] = Sse2.Multiply(left._vector.GetVector128UInt(j),
+                                    right._vector.GetVector128UInt(j));
+                            }
+
+                            processedSubOperations += blocks128.Length << 2;
+                            remainingSubOperations -= blocks128.Length << 2;
+                        }
+
+                        if (remainingSubOperations > 1)
+                        {
+                            uint[] values = new uint[remainingSubOperations];
+
+                            values[0] = left._vector.GetUInt(processedSubOperations) *
+                                        right._vector.GetUInt(processedSubOperations++);
+                            values[1] = left._vector.GetUInt(processedSubOperations) *
+                                        right._vector.GetUInt(processedSubOperations++);
+
+                            if (remainingSubOperations == 3)
+                            {
+                                values[2] = left._vector.GetUInt(processedSubOperations) *
+                                            right._vector.GetUInt(processedSubOperations);
+                            }
+
+                            return Create(count, blocks256, blocks128, values);
+                        }
+                        else if (remainingSubOperations == 1)
+                        {
+                            return Create(count, blocks256, blocks128,
+                                left._vector.GetUInt(processedSubOperations) *
+                                right._vector.GetUInt(processedSubOperations));
+                        }
+
+                        return Create(count, blocks256, blocks128, value: null);*/
+                }
+            }
+            else if (typeof(T) == typeof(int))
+            {
+                switch (count)
+                {
+                    /*case 8 when IntrinsicSupport.IsAvx2Supported:
+                        return Create(count,
+                            Avx2.Multiply(left._vector.GetVector256Int(0), right._vector.GetVector256Int(0)));
+                    case < 8 and > 4 when IntrinsicSupport.IsSse2Supported:
+                        Vector128<int> lower128 = Sse2.Multiply(left._vector.GetVector128Int(0),
+                            right._vector.GetVector128Int(0));
+
+                        int[] upperValues = new int[count - 4];
+                        int remaining = upperValues.Length;
+                        int position = 0;
+                        int arrayPosition = 4;
+
+                        if (remaining >= 2)
+                        {
+                            upperValues[0] = left._vector.GetInt(4) * right._vector.GetInt(4);
+                            upperValues[1] = left._vector.GetInt(5) * right._vector.GetInt(5);
+                            position = 2;
+                            remaining -= 2;
+                            arrayPosition = 6;
+                        }
+
+                        if (remaining == 1)
+                        {
+                            upperValues[position] =
+                                left._vector.GetInt(arrayPosition) * right._vector.GetInt(arrayPosition);
+                        }
+
+                        return Create(count, lower128, upperValues);
+                    case 4 when IntrinsicSupport.IsSse2Supported:
+                        return Create(count,
+                            Sse2.Multiply(left._vector.GetVector128Int(0), right._vector.GetVector128Int(0)));*/
+                    //TODO Support Vector64<T> on Arm
+                    //TODO Is it worth extending Vector64<T>s to Vector128<T>s to use Sse2 on x86 since MMX is not supported?
+                    /*case 2 when AdvSimd.IsSupported:
+                        break;*/
+                    case 1:
+                        return Create(left._vector.GetInt(0) * right._vector.GetInt(0));
+                    default:
+                        //Assumption is made that no Sse2 support means no Avx2 support
+                        //if (!IntrinsicSupport.IsSse2Supported)
+                        {
+                            int[] values = new int[count];
+
+                            for (int i = 0; i < values.Length; i++)
+                            {
+                                values[i] = left._vector.GetInt(i) * right._vector.GetInt(i);
+                            }
+
+                            return Create(values);
+                        }
+
+                        /*Vector128<int>[] blocks128 = null;
+                        Vector256<int>[] blocks256 = null;
+
+                        int remainingSubOperations = count;
+                        int processedSubOperations = 0;
+
+                        if (IntrinsicSupport.IsAvx2Supported && remainingSubOperations >= 8)
+                        {
+                            //remainingSubOperations >> 3 = remainingSubOperations / 8
+                            blocks256 = new Vector256<int>[remainingSubOperations >> 3];
+
+                            for (int i = 0; i < blocks256.Length; i++)
+                            {
+                                blocks256[i] = Avx2.Multiply(left._vector.GetVector256Int(i),
+                                    right._vector.GetVector256Int(i));
+                            }
+
+                            processedSubOperations = blocks256.Length << 3;
+                            remainingSubOperations -= processedSubOperations;
+                        }
+
+                        if (remainingSubOperations >= 4)
+                        {
+                            //remainingSubOperations >> 2 = remainingSubOperations / 4
+                            blocks128 = new Vector128<int>[remainingSubOperations >> 2];
+
+                            for (int i = 0, j = processedSubOperations >> 2; i < blocks128.Length; i++, j++)
+                            {
+                                blocks128[i] = Sse2.Multiply(left._vector.GetVector128Int(j),
+                                    right._vector.GetVector128Int(j));
+                            }
+
+                            processedSubOperations += blocks128.Length << 2;
+                            remainingSubOperations -= blocks128.Length << 2;
+                        }
+
+                        if (remainingSubOperations > 1)
+                        {
+                            int[] values = new int[remainingSubOperations];
+
+                            values[0] = left._vector.GetInt(processedSubOperations) *
+                                        right._vector.GetInt(processedSubOperations++);
+                            values[1] = left._vector.GetInt(processedSubOperations) *
+                                        right._vector.GetInt(processedSubOperations++);
+
+                            if (remainingSubOperations == 3)
+                            {
+                                values[2] = left._vector.GetInt(processedSubOperations) *
+                                            right._vector.GetInt(processedSubOperations);
+                            }
+
+                            return Create(count, blocks256, blocks128, values);
+                        }
+                        else if (remainingSubOperations == 1)
+                        {
+                            return Create(count, blocks256, blocks128,
+                                left._vector.GetInt(processedSubOperations) *
+                                right._vector.GetInt(processedSubOperations));
+                        }
+
+                        return Create(count, blocks256, blocks128, value: null);*/
+                }
+            }
+            else if (typeof(T) == typeof(ulong))
+            {
+                switch (count)
+                {
+                    /*case 4 when IntrinsicSupport.IsAvx2Supported:
+                        return Create(count,
+                            Avx2.Multiply(left._vector.GetVector256ULong(0), right._vector.GetVector256ULong(0)));
+                    case 3 when IntrinsicSupport.IsSse2Supported:
+                        return Create(count,
+                            Sse2.Multiply(left._vector.GetVector128ULong(0), right._vector.GetVector128ULong(0)),
+                            left._vector.GetULong(3) * right._vector.GetULong(3));
+                    case 2 when IntrinsicSupport.IsSse2Supported:
+                        return Create(count,
+                            Sse2.Multiply(left._vector.GetVector128ULong(0), right._vector.GetVector128ULong(0)));*/
+                    case 1:
+                        return Create(left._vector.GetULong(0) * right._vector.GetULong(0));
+                    default:
+                        //Assumption is made that no Sse2 support means no Avx2 support
+                        //if (!IntrinsicSupport.IsSse2Supported)
+                        {
+                            ulong[] values = new ulong[count];
+
+                            for (int i = 0; i < values.Length; i++)
+                            {
+                                values[i] = left._vector.GetULong(i) * right._vector.GetULong(i);
+                            }
+
+                            return Create(values);
+                        }
+
+                        /*Vector128<ulong>[] blocks128 = null;
+                        Vector256<ulong>[] blocks256 = null;
+
+                        int remainingSubOperations = count;
+                        int processedSubOperations = 0;
+
+                        if (IntrinsicSupport.IsAvx2Supported && remainingSubOperations >= 4)
+                        {
+                            //remainingSubOperations >> 2 = remainingSubOperations / 4
+                            blocks256 = new Vector256<ulong>[remainingSubOperations >> 2];
+
+                            for (int i = 0; i < blocks256.Length; i++)
+                            {
+                                blocks256[i] = Avx2.Multiply(left._vector.GetVector256ULong(i),
+                                    right._vector.GetVector256ULong(i));
+                            }
+
+                            processedSubOperations = blocks256.Length << 2;
+                            remainingSubOperations -= processedSubOperations;
+                        }
+
+                        if (remainingSubOperations >= 2)
+                        {
+                            //remainingSubOperations >> 1 = remainingSubOperations / 2
+                            blocks128 = new Vector128<ulong>[remainingSubOperations >> 1];
+
+                            for (int i = 0, j = processedSubOperations >> 1; i < blocks128.Length; i++, j++)
+                            {
+                                blocks128[i] = Sse2.Multiply(left._vector.GetVector128ULong(j),
+                                    right._vector.GetVector128ULong(j));
+                            }
+
+                            processedSubOperations += blocks128.Length << 1;
+                            remainingSubOperations -= blocks128.Length << 1;
+                        }
+
+                        if (remainingSubOperations == 1)
+                        {
+                            return Create(count, blocks256, blocks128,
+                                left._vector.GetULong(processedSubOperations) *
+                                right._vector.GetULong(processedSubOperations));
+                        }
+
+                        return Create(count, blocks256, blocks128, value: null);*/
+                }
+            }
+            else if (typeof(T) == typeof(long))
+            {
+                switch (count)
+                {
+                    /*case 4 when IntrinsicSupport.IsAvx2Supported:
+                        return Create(count,
+                            Avx2.Multiply(left._vector.GetVector256Long(0), right._vector.GetVector256Long(0)));
+                    case 3 when IntrinsicSupport.IsSse2Supported:
+                        return Create(count,
+                            Sse2.Multiply(left._vector.GetVector128Long(0), right._vector.GetVector128Long(0)),
+                            left._vector.GetLong(3) * right._vector.GetLong(3));
+                    case 2 when IntrinsicSupport.IsSse2Supported:
+                        return Create(count,
+                            Sse2.Multiply(left._vector.GetVector128Long(0), right._vector.GetVector128Long(0)));*/
+                    case 1:
+                        return Create(left._vector.GetLong(0) * right._vector.GetLong(0));
+                    default:
+                        //Assumption is made that no Sse2 support means no Avx2 support
+                        //if (!IntrinsicSupport.IsSse2Supported)
+                        {
+                            long[] values = new long[count];
+
+                            for (int i = 0; i < values.Length; i++)
+                            {
+                                values[i] = left._vector.GetLong(i) * right._vector.GetLong(i);
+                            }
+
+                            return Create(values);
+                        }
+
+                        /*Vector128<long>[] blocks128 = null;
+                        Vector256<long>[] blocks256 = null;
+
+                        int remainingSubOperations = count;
+                        int processedSubOperations = 0;
+
+                        if (IntrinsicSupport.IsAvx2Supported && remainingSubOperations >= 4)
+                        {
+                            //remainingSubOperations >> 2 = remainingSubOperations / 4
+                            blocks256 = new Vector256<long>[remainingSubOperations >> 2];
+
+                            for (int i = 0; i < blocks256.Length; i++)
+                            {
+                                blocks256[i] = Avx2.Multiply(left._vector.GetVector256Long(i),
+                                    right._vector.GetVector256Long(i));
+                            }
+
+                            processedSubOperations = blocks256.Length << 2;
+                            remainingSubOperations -= processedSubOperations;
+                        }
+
+                        if (remainingSubOperations >= 2)
+                        {
+                            //remainingSubOperations >> 1 = remainingSubOperations / 2
+                            blocks128 = new Vector128<long>[remainingSubOperations >> 1];
+
+                            for (int i = 0, j = processedSubOperations >> 1; i < blocks128.Length; i++, j++)
+                            {
+                                blocks128[i] = Sse2.Multiply(left._vector.GetVector128Long(j),
+                                    right._vector.GetVector128Long(j));
+                            }
+
+                            processedSubOperations += blocks128.Length << 1;
+                            remainingSubOperations -= blocks128.Length << 1;
+                        }
+
+                        if (remainingSubOperations == 1)
+                        {
+                            return Create(count, blocks256, blocks128,
+                                left._vector.GetLong(processedSubOperations) *
+                                right._vector.GetLong(processedSubOperations));
+                        }
+
+                        return Create(count, blocks256, blocks128, value: null);*/
+                }
+            }
+            else if (typeof(T) == typeof(float))
+            {
+                switch (count)
+                {
+                    case 8 when IntrinsicSupport.IsAvxSupported:
+                        return Create(count,
+                            Avx.Multiply(left._vector.GetVector256Float(0), right._vector.GetVector256Float(0)));
+                    case < 8 and > 4 when IntrinsicSupport.IsSseSupported:
+                        Vector128<float> lower128 = Sse.Multiply(left._vector.GetVector128Float(0),
+                            right._vector.GetVector128Float(0));
+
+                        float[] upperValues = new float[count - 4];
+
+                        int remaining = upperValues.Length;
+                        int position = 0;
+                        int arrayPosition = 4;
+
+                        //TODO Figure out if this is any faster than the for loop that was here
+                        if (remaining >= 2)
+                        {
+                            upperValues[0] = left._vector.GetFloat(8) * right._vector.GetFloat(8);
+                            upperValues[1] = left._vector.GetFloat(9) * right._vector.GetFloat(9);
+                            position = 2;
+                            remaining -= 2;
+                            arrayPosition = 10;
+                        }
+
+                        if (remaining == 1)
+                        {
+                            upperValues[position] =
+                                left._vector.GetFloat(arrayPosition) * right._vector.GetFloat(arrayPosition);
+                        }
+
+                        return Create(count, lower128, upperValues);
+                    case 4 when IntrinsicSupport.IsSseSupported:
+                        return Create(count,
+                            Sse.Multiply(left._vector.GetVector128Float(0),
+                                right._vector.GetVector128Float(0)));
+                    //TODO Support Vector64<T> on Arm
+                    //TODO Is it worth extending Vector64<T>s to Vector128<T>s to use Sse2 on x86 since MMX is not supported?
+                    /*case 2 when AdvSimd.IsSupported:
+                        break;*/
+                    case 1:
+                        return Create(left._vector.GetFloat(0) * right._vector.GetFloat(0));
+                    default:
+                        //Assumption is made that no Sse support means no Avx support
+                        if (!IntrinsicSupport.IsSseSupported)
+                        {
+                            float[] values = new float[count];
+
+                            for (int i = 0; i < values.Length; i++)
+                            {
+                                values[i] = left._vector.GetFloat(i) * right._vector.GetFloat(i);
+                            }
+
+                            return Create(values);
+                        }
+
+                        Vector128<float>[] blocks128 = null;
+                        Vector256<float>[] blocks256 = null;
+
+                        int remainingSubOperations = count;
+                        int processedSubOperations = 0;
+
+                        if (IntrinsicSupport.IsAvxSupported && remainingSubOperations >= 8)
+                        {
+                            //remainingSubOperations >> 3 = remainingSubOperations / 8
+                            blocks256 = new Vector256<float>[remainingSubOperations >> 3];
+
+                            for (int i = 0; i < blocks256.Length; i++)
+                            {
+                                blocks256[i] = Avx.Multiply(left._vector.GetVector256Float(i),
+                                    right._vector.GetVector256Float(i));
+                            }
+
+                            processedSubOperations = blocks256.Length << 3;
+                            remainingSubOperations -= processedSubOperations;
+                        }
+
+                        if (remainingSubOperations >= 4)
+                        {
+                            //remainingSubOperations >> 2 = remainingSubOperations / 4
+                            blocks128 = new Vector128<float>[remainingSubOperations >> 2];
+
+                            for (int i = 0, j = processedSubOperations >> 2; i < blocks128.Length; i++, j++)
+                            {
+                                blocks128[i] = Sse.Multiply(left._vector.GetVector128Float(j),
+                                    right._vector.GetVector128Float(j));
+                            }
+
+                            processedSubOperations += blocks128.Length << 2;
+                            remainingSubOperations -= blocks128.Length << 2;
+                        }
+
+                        if (remainingSubOperations > 1)
+                        {
+                            float[] values = new float[remainingSubOperations];
+
+                            values[0] = left._vector.GetFloat(processedSubOperations) *
+                                        right._vector.GetFloat(processedSubOperations++);
+                            values[1] = left._vector.GetFloat(processedSubOperations) *
+                                        right._vector.GetFloat(processedSubOperations++);
+
+                            if (remainingSubOperations == 3)
+                            {
+                                values[2] = left._vector.GetFloat(processedSubOperations) *
+                                            right._vector.GetFloat(processedSubOperations);
+                            }
+
+                            return Create(count, blocks256, blocks128, values);
+                        }
+                        else if (remainingSubOperations == 1)
+                        {
+                            return Create(count, blocks256, blocks128,
+                                left._vector.GetFloat(processedSubOperations) *
+                                right._vector.GetFloat(processedSubOperations));
+                        }
+
+                        return Create(count, blocks256, blocks128, value: null);
+                }
+            }
+            else if (typeof(T) == typeof(double))
+            {
+                switch (count)
+                {
+                    case 4 when IntrinsicSupport.IsAvxSupported:
+                        return Create(count,
+                            Avx.Multiply(left._vector.GetVector256Double(0), right._vector.GetVector256Double(0)));
+                    case 3 when IntrinsicSupport.IsSse2Supported:
+                        return Create(count,
+                            Sse2.Multiply(left._vector.GetVector128Double(0), right._vector.GetVector128Double(0)),
+                            left._vector.GetDouble(3) * right._vector.GetDouble(3));
+                    case 2 when IntrinsicSupport.IsSse2Supported:
+                        return Create(count,
+                            Sse2.Multiply(left._vector.GetVector128Double(0),
+                                right._vector.GetVector128Double(0)));
+                    case 1:
+                        return Create(left._vector.GetDouble(0) * right._vector.GetDouble(0));
+                    default:
+                        //Assumption is made that no Sse2 support means no Avx support
+                        if (!IntrinsicSupport.IsSse2Supported)
+                        {
+                            double[] values = new double[count];
+
+                            for (int i = 0; i < values.Length; i++)
+                            {
+                                values[i] = left._vector.GetDouble(i) * right._vector.GetDouble(i);
+                            }
+
+                            return Create(values);
+                        }
+
+                        Vector128<double>[] blocks128 = null;
+                        Vector256<double>[] blocks256 = null;
+
+                        int remainingSubOperations = count;
+                        int processedSubOperations = 0;
+
+                        if (IntrinsicSupport.IsAvxSupported && remainingSubOperations >= 4)
+                        {
+                            //remainingSubOperations >> 2 = remainingSubOperations / 4
+                            blocks256 = new Vector256<double>[remainingSubOperations >> 2];
+
+                            for (int i = 0; i < blocks256.Length; i++)
+                            {
+                                blocks256[i] = Avx.Multiply(left._vector.GetVector256Double(i),
+                                    right._vector.GetVector256Double(i));
+                            }
+
+                            processedSubOperations = blocks256.Length << 2;
+                            remainingSubOperations -= processedSubOperations;
+                        }
+
+                        if (remainingSubOperations >= 2)
+                        {
+                            //remainingSubOperations >> 1 = remainingSubOperations / 2
+                            blocks128 = new Vector128<double>[remainingSubOperations >> 1];
+
+                            for (int i = 0, j = processedSubOperations >> 1; i < blocks128.Length; i++, j++)
+                            {
+                                blocks128[i] = Sse2.Multiply(left._vector.GetVector128Double(j),
+                                    right._vector.GetVector128Double(j));
+                            }
+
+                            processedSubOperations += blocks128.Length << 1;
+                            remainingSubOperations -= blocks128.Length << 1;
+                        }
+
+                        if (remainingSubOperations == 1)
+                        {
+                            return Create(count, blocks256, blocks128,
+                                left._vector.GetDouble(processedSubOperations) *
+                                right._vector.GetDouble(processedSubOperations));
+                        }
+
+                        return Create(count, blocks256, blocks128, value: null);
+                }
             }
             else
             {
-                size = left._vector.Length;
-            }
-
-            switch (size)
-            {
-                //Full size vector instructions
-                case 2 when Sse2.IsSupported:
-                //return new Vector<T>(Sse2.Multiply(left._vector.ToVector128(0), right._vector.ToVector128(0)));
-                case 3 when Avx.IsSupported:
-                case 4 when Avx.IsSupported:
-                /*return new Vector<T>(Avx.Multiply(left._vector.ToVector256(0), right._vector.ToVector256(0)),
-                    size);*/
-
-                //Partial size vector instructions
-                case 3 when Sse2.IsSupported:
-                /*return new Vector<T>(Sse2.Multiply(left._vector.ToVector128(0), right._vector.ToVector128(0)),
-                    left._vector.GetValue<T>(2) * right._vector.GetValue<T>(2));*/
-                case 4 when Sse2.IsSupported:
-                /*return new Vector<T>(Sse2.Multiply(left._vector.ToVector128(0), right._vector.ToVector128(0)),
-                    Sse2.Multiply(left._vector.ToVector128(1), right._vector.ToVector128(1)));*/
-
-                //Software fallback
-                case 1:
-                //return new Vector<T>(left._vector.GetValue<T>(0) * right._vector.GetValue<T>(0));
-                case 2:
-                /*return new Vector<T>(
-                    new[]
-                    {
-                        left._vector.GetValue<T>(0) * right._vector.GetValue<T>(0),
-                        left._vector.GetValue<T>(1) * right._vector.GetValue<T>(1)
-                    }, 0);*/
-                case 3:
-                /*return new Vector<T>(
-                    new[]
-                    {
-                        left._vector.GetValue<T>(0) * right._vector.GetValue<T>(0),
-                        left._vector.GetValue<T>(1) * right._vector.GetValue<T>(1),
-                        left._vector.GetValue<T>(2) * right._vector.GetValue<T>(2)
-                    }, 0);*/
-                case 4:
-                /*return new Vector<T>(
-                    new[]
-                    {
-                        left._vector.GetValue<T>(0) * right._vector.GetValue<T>(0),
-                        left._vector.GetValue<T>(1) * right._vector.GetValue<T>(1),
-                        left._vector.GetValue<T>(2) * right._vector.GetValue<T>(2),
-                        left._vector.GetValue<T>(3) * right._vector.GetValue<T>(3)
-                    }, 0);*/
-                default:
-                    //Assumption is made that no Sse2 support means no Avx support
-                    if (!Sse2.IsSupported)
-                    {
-                        T[] values64 = new T[size];
-
-                        for (int i = 0; i < values64.Length; i++)
-                        {
-                            //values64[i] = left._vector.GetValue<T>(i) * right._vector.GetValue<T>(i);
-                        }
-
-                        return new Vector<T>(values64);
-                    }
-
-                    Vector128<T>[] blocks128 = null;
-                    Vector256<T>[] blocks256 = null;
-
-                    int remainingSubOperations = size;
-                    int processedSubOperations = 0;
-
-                    if (Avx.IsSupported && remainingSubOperations >= 4)
-                    {
-                        blocks256 = new Vector256<T>[remainingSubOperations >> 2];
-
-                        for (int i = 0; i < blocks256.Length; i++)
-                        {
-                            //blocks256[i] = Avx.Multiply(left._vector.ToVector256(i), right._vector.ToVector256(i));
-                        }
-
-                        remainingSubOperations -= blocks256.Length << 2;
-                        processedSubOperations += blocks256.Length << 2;
-                    }
-
-                    if (remainingSubOperations >= 2)
-                    {
-                        blocks128 = new Vector128<T>[remainingSubOperations >> 1];
-
-                        for (int i = 0, j = processedSubOperations >> 1; i < blocks128.Length; i++, j++)
-                        {
-                            //blocks128[i] = Sse2.Multiply(left._vector.ToVector128(j), right._vector.ToVector128(j));
-                        }
-
-                        remainingSubOperations -= blocks128.Length << 1;
-                        processedSubOperations += blocks128.Length << 1;
-                    }
-
-                    if (remainingSubOperations == 1)
-                    {
-                        /*return new Vector<T>(size,
-                            left._vector[processedSubOperations] * right._vector[processedSubOperations], blocks128,
-                            blocks256);*/
-                    }
-
-                    return new Vector<T>(new T[size]);
+                throw new NotSupportedException();
             }
         }
 
