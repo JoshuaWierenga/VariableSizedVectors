@@ -3,7 +3,8 @@ move these todos to github issues
 code generation using t4
 iron out issues with implicit casting. use specialisation instead of constraints?
 allow using vector.Blend instead of vector<type, size>.Blend, it should be possible to figure out type and size from the arguments. move static functions out of struct? 
-automatically generate Vector.cpp using TextTransform.exe
+automatically generate Vector.cpp using TextTransform.exe at build time
+improve error messages. currently for example using vector<int, 128>::Blend with 256 bit types gives multiple copies of "'vector<int32_t,256>::vector_256_': cannot access private member declared in class 'vector<int32_t,256>'"	
 
 
 Blend testing, its here because it currently fails and t4 lacks proper commenting, old annoying copy is fine though
