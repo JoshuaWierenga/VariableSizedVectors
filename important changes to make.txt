@@ -1,0 +1,3 @@
+code generation using t4
+iron out issues with implicit casting. use specialisation instead of constraints?
+allow using vector.Blend instead of vector<type, size>.Blend, it should be possible to figure out type and size from the arguments. move static functions out of struct? 
