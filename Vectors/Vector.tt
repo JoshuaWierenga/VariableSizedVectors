@@ -10,6 +10,8 @@
 	var vectorSimdPrefixes = new string[] {"mm"};
 	var typeSimdSuffixes = new string[] {"32"}; #>
 #include <intrin.h>
+#include <ostream>
+#include <sstream>
 
 template <uint_fast16_t X>
 _INLINE_VAR constexpr bool is_simd_128 = X == 128;
