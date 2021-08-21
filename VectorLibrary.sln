@@ -8,20 +8,31 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Vectors", "Vectors\Vectors.vcxitems", "{F00F1CAF-F17F-49D5-82E7-11D7BE2C0BAC}"
 EndProject
 Global
+	GlobalSection(SharedMSBuildProjectFiles) = preSolution
+		Vectors\Vectors.vcxitems*{4dbd6f6e-6298-46c2-b763-7d3babe7d103}*SharedItemsImports = 4
+		Vectors\Vectors.vcxitems*{f00f1caf-f17f-49d5-82e7-11d7be2c0bac}*SharedItemsImports = 9
+	EndGlobalSection
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Debug|x64 = Debug|x64
 		Debug|x86 = Debug|x86
+		Development|Any CPU = Development|Any CPU
+		Development|x64 = Development|x64
+		Development|x86 = Development|x86
 		Release|Any CPU = Release|Any CPU
 		Release|x64 = Release|x64
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{4DBD6F6E-6298-46C2-B763-7D3BABE7D103}.Debug|Any CPU.ActiveCfg = Debug|Win32
+		{4DBD6F6E-6298-46C2-B763-7D3BABE7D103}.Debug|Any CPU.Build.0 = Debug|Win32
 		{4DBD6F6E-6298-46C2-B763-7D3BABE7D103}.Debug|x64.ActiveCfg = Debug|x64
 		{4DBD6F6E-6298-46C2-B763-7D3BABE7D103}.Debug|x64.Build.0 = Debug|x64
 		{4DBD6F6E-6298-46C2-B763-7D3BABE7D103}.Debug|x86.ActiveCfg = Debug|Win32
 		{4DBD6F6E-6298-46C2-B763-7D3BABE7D103}.Debug|x86.Build.0 = Debug|Win32
+		{4DBD6F6E-6298-46C2-B763-7D3BABE7D103}.Development|Any CPU.ActiveCfg = Development|Win32
+		{4DBD6F6E-6298-46C2-B763-7D3BABE7D103}.Development|x64.ActiveCfg = Development|x64
+		{4DBD6F6E-6298-46C2-B763-7D3BABE7D103}.Development|x86.ActiveCfg = Development|Win32
 		{4DBD6F6E-6298-46C2-B763-7D3BABE7D103}.Release|Any CPU.ActiveCfg = Release|Win32
 		{4DBD6F6E-6298-46C2-B763-7D3BABE7D103}.Release|Any CPU.Build.0 = Release|Win32
 		{4DBD6F6E-6298-46C2-B763-7D3BABE7D103}.Release|x64.ActiveCfg = Release|x64

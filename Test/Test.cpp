@@ -1,6 +1,6 @@
 #include <iostream>
-//TODO Add Vector.h, does that also need a tt file?
-#include "Vector.cpp"
+#include "Vector.h"
+#include "VectorHelpers.h"
 
 void simple128test()
 {
