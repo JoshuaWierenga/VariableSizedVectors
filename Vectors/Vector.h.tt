@@ -67,8 +67,6 @@ public:
 template <> <#= typeVectorName #>::Vector(<#= typeName #> value);
 template <> <#= typeVectorName #>::Vector(std::array<<#= typeName#>, <#= vectorSize / typeSize #>> values);
 
-template <> <#= typeVectorName #> <#= typeVectorName #>::Blend(<#= typeVectorName #> comparision, <#= typeVectorName #> falseValue, <#= typeVectorName #> trueValue);
-
 // Assignment Operators
 template <> <#= typeVectorName #>& <#= typeVectorName #>::operator+=(const <#= typeVectorName #>& rhs);
 

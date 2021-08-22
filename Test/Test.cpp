@@ -9,7 +9,7 @@ void simple128test()
 
 	Vector<int32_t, 128> vArray(array[0], array[1], array[2], array[3]);
 
-	vArray += Vector<int, 128>::Blend(vArray > value, adjustment2, adjustment1);
+	vArray += Blend(vArray > value, adjustment2, adjustment1);
 
 	std::cout << "simple 128 bit test:" << std::endl << vArray << std::endl << std::endl;
 }
@@ -21,7 +21,7 @@ void simple256test()
 
 	Vector<int, 256> vArray(array[0], array[1], array[2], array[3], array[4], array[5], array[6], array[7]);
 
-	vArray += Vector<int, 256>::Blend(vArray > value, adjustment, 0);
+	vArray += Blend(vArray > value, adjustment, 0);
 
 	std::cout << "simple 256 bit test" << std::endl << vArray << std::endl << std::endl;
 }

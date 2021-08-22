@@ -1,32 +1,5 @@
 TODO:
 move these todos to github issues
-code generation using t4
-iron out issues with implicit casting. use specialisation instead of constraints?
-allow using vector.Blend instead of vector<type, size>.Blend, it should be possible to figure out type and size from the arguments. move static functions out of struct? 
+move VectorHelpers.{h, cpp} into Vector.{h, cpp}
 automatically generate Vector.cpp using TextTransform.exe at build time
-improve error messages. currently for example using vector<int, 128>::Blend with 256 bit types gives multiple copies of "'vector<int32_t,256>::vector_256_': cannot access private member declared in class 'vector<int32_t,256>'"	
-
-
-Blend testing, its here because it currently fails and t4 lacks proper commenting, old annoying copy is fine though
-// Blend Functions
-<#	for (int i = 0; i < vectorSizes.Length; i++)
-	{ 
-		//Required variables
-		string vectorSize = vectorSizes[i], vectorSimdPrefix = vectorSimdPrefixes[i];
-
-		//Niceties
-		string vectorVariableName = "vector_" + vectorSize + "_";
-
-		for (int j = 0; j < typeSizes.Length; j++)
-		{ 
-			//Required variables
-			string typeSize = typeSizes[j];
-
-			//Niceties
-			string typeName = "int" + typeSize + "_t", fullVectorName = "vector<" + typeName + ", " + vectorSize + ">"; #>
-<#= fullVectorName #> static Blend(const <#= fullVectorName #> comparision, const <#= fullVectorName #> falseValue, const <#= fullVectorName #> trueValue)
-{
-	return _<#= vectorSimdPrefix #>_blendv_epi8(falseValue.<#= vectorVariableName #>, trueValue.<#= vectorVariableName #>, comparision.<#= vectorVariableName #>);
-}
-<#		}
-	} #>
+improve error messages, somewhat already improved with last rewrite

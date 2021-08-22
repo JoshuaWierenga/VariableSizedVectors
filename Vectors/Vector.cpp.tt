@@ -41,13 +41,6 @@ template <>
 {
 }
 
-//TODO Figure out how to make the types of the parameters enough to figure out which version to use and not require specifying when accessing vector
-template <>
-<#= typeVectorName #> <#= typeVectorName #>::Blend(const <#= typeVectorName #> comparision, const <#= typeVectorName #> falseValue, const <#= typeVectorName #> trueValue)
-{
-	return _<#= vectorSimdPrefix #>_blendv_epi8(falseValue.<#= vectorVariableName #>, trueValue.<#= vectorVariableName #>, comparision.<#= vectorVariableName #>);
-}
-
 // Assignment Operators
 template <>
 <#= typeVectorName #>& <#= typeVectorName #>::operator+=(const <#= typeVectorName #>& rhs)

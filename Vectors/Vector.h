@@ -51,8 +51,6 @@ public:
 template <> Vector<int32_t, 128>::Vector(int32_t value);
 template <> Vector<int32_t, 128>::Vector(std::array<int32_t, 4> values);
 
-template <> Vector<int32_t, 128> Vector<int32_t, 128>::Blend(Vector<int32_t, 128> comparision, Vector<int32_t, 128> falseValue, Vector<int32_t, 128> trueValue);
-
 // Assignment Operators
 template <> Vector<int32_t, 128>& Vector<int32_t, 128>::operator+=(const Vector<int32_t, 128>& rhs);
 
@@ -64,8 +62,6 @@ template <> Vector<int32_t, 128> Vector<int32_t, 128>::operator>(const Vector<in
 // Constructors
 template <> Vector<int32_t, 256>::Vector(int32_t value);
 template <> Vector<int32_t, 256>::Vector(std::array<int32_t, 8> values);
-
-template <> Vector<int32_t, 256> Vector<int32_t, 256>::Blend(Vector<int32_t, 256> comparision, Vector<int32_t, 256> falseValue, Vector<int32_t, 256> trueValue);
 
 // Assignment Operators
 template <> Vector<int32_t, 256>& Vector<int32_t, 256>::operator+=(const Vector<int32_t, 256>& rhs);
