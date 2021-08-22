@@ -12,11 +12,10 @@
 #include <type_traits>
 
 template <typename T, uint_fast16_t X>
-struct Vector
+class Vector
 {
-	friend class VectorHelpers;
+	friend struct VectorHelpers;
 
-private:
 	__m128i vector_128_{};
 	__m256i vector_256_{};
 
@@ -66,6 +65,10 @@ public:
 // Constructors
 template <> <#= typeVectorName #>::Vector(<#= typeName #> value);
 template <> <#= typeVectorName #>::Vector(std::array<<#= typeName#>, <#= vectorSize / typeSize #>> values);
+
+std::ostream& operator<<(std::ostream& stream, const <#= typeVectorName #>& vector);
+
+<#= typeVectorName #> Blend(<#= typeVectorName #> comparision, <#= typeVectorName #> falseValue, <#= typeVectorName #> trueValue);
 
 // Assignment Operators
 template <> <#= typeVectorName #>& <#= typeVectorName #>::operator+=(const <#= typeVectorName #>& rhs);

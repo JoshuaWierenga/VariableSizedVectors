@@ -1,6 +1,5 @@
 #include <iostream>
 #include "Vector.h"
-#include "VectorHelpers.h"
 
 void simple128test()
 {

@@ -19,10 +19,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="$(MSBuildThisFileDirectory)Vector.cpp" />
-    <ClCompile Include="$(MSBuildThisFileDirectory)VectorHelpers.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="$(MSBuildThisFileDirectory)Vector.h" />
-    <ClInclude Include="$(MSBuildThisFileDirectory)VectorHelpers.h" />
   </ItemGroup>
 </Project>
