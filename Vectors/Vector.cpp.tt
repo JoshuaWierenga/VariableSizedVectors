@@ -2,36 +2,20 @@
 <#@ output extension="" #>
 //TODO Merge string info arrays into a single structure
 //TODO Automate generation of typeVectorConstructorArguments
-<#	var typeSizes = new string[] {"32"}; 
-	var vectorSizes = new string[] {"128", "256"};
+<#	var typeSizes = new int[] {32}; 
+	var vectorSizes = new int[] {128, 256};
 
-	var typeVectorConstructorArguments = new string[,] {{"const int32_t v1, const int32_t v2, const int32_t v3, const int32_t v4"},
-													    {"const int32_t v1, const int32_t v2, const int32_t v3, const int32_t v4, const int32_t v5, const int32_t v6, const int32_t v7, const int32_t v8"}};
-	var typeVectorSetArguments = new string[,] {{"v1, v2, v3, v4"}, {"v1, v2, v3, v4, v6, v6, v7, v8"}};
+	var typeVectorSetArguments = new string[,] {{"values[0], values[1], values[2], values[3]"}, {"values[0], values[1], values[2], values[3], values[4], values[5], values[6], values[7]"}};
 
 	var vectorSimdPrefixes = new string[] {"mm", "mm256"};
 	var typeSimdSuffixes = new string[] {"32"}; #>
-#ifdef _DEVELOPMENT
-#include <intrin.h>
-#include <sstream>
 #include "Vector.h"
-#endif
-
-//TODO Generate automatically?
-template<typename T, uint_fast16_t X>
-vector<T, X>::vector(const __m128i vector) : vector_128_(vector)
-{
-}
-
-template<typename T, uint_fast16_t X>
-vector<T, X>::vector(const __m256i vector) : vector_256_(vector)
-{
-}
 
 <#	for (int i = 0; i < vectorSizes.Length; i++)
 	{
 		//Required variables
-		string vectorSize = vectorSizes[i], vectorSimdPrefix = vectorSimdPrefixes[i];
+		int vectorSize = vectorSizes[i];
+		string vectorSimdPrefix = vectorSimdPrefixes[i];
 
 		//Niceties
 		string vectorVariableName = "vector_" + vectorSize + "_";
@@ -39,47 +23,46 @@ vector<T, X>::vector(const __m256i vector) : vector_256_(vector)
 		for (int j = 0; j < typeSizes.Length; j++)
 		{ 
 			//Required variables
-			string typeSize = typeSizes[j], typeVectorConstructorArgument = typeVectorConstructorArguments[i,j];
+			int typeSize = typeSizes[j];
 			string typeSimdSuffix = typeSimdSuffixes[j], typeVectorSetArgument = typeVectorSetArguments[i,j];
 			
 			//Niceties
-			string typeName = "int" + typeSize + "_t", fullVectorName = "vector<" + typeName + ", " + vectorSize + ">";
-			string typeVectorConstraints = "requires(std::is_same_v<T, " + typeName + "> && is_simd_" + vectorSize + "<X>)";#>
-#pragma region <#= fullVectorName #>
+			string typeName = "int" + typeSize + "_t", typeVectorName = "Vector<" + typeName + ", " + vectorSize + ">"; #>
+#pragma region <#= typeVectorName #>
 
 // Constructors
-template<typename T, uint_fast16_t X>
-vector<T, X>::vector(const <#= typeName #> value) <#= typeVectorConstraints #> : <#= vectorVariableName #>(_<#= vectorSimdPrefix #>_set1_epi<#= typeSimdSuffix #>(value))
+template <>
+<#= typeVectorName #>::Vector(const <#= typeName #> value) : <#= vectorVariableName #>(_<#= vectorSimdPrefix #>_set1_epi<#= typeSimdSuffix #>(value))
 {
 }
 
-template<typename T, uint_fast16_t X>
-vector<T, X>::vector(<#= typeVectorConstructorArgument #>) <#= typeVectorConstraints #> : <#= vectorVariableName #>(_<#= vectorSimdPrefix #>_setr_epi<#= typeSimdSuffix #>(<#= typeVectorSetArgument #>))
+template <>
+<#= typeVectorName #>::Vector(const std::array<<#= typeName #>, <#= vectorSize / typeSize #>> values) : <#= vectorVariableName #>(_<#= vectorSimdPrefix #>_setr_epi<#= typeSimdSuffix #>(<#= typeVectorSetArgument #>))
 {
 }
 
 //TODO Figure out how to make the types of the parameters enough to figure out which version to use and not require specifying when accessing vector
-template<typename T, uint_fast16_t X>
-<#= fullVectorName #> vector<T, X>::Blend(const <#= fullVectorName #> comparision, const <#= fullVectorName #> falseValue, const <#= fullVectorName #> trueValue)
+template <>
+<#= typeVectorName #> <#= typeVectorName #>::Blend(const <#= typeVectorName #> comparision, const <#= typeVectorName #> falseValue, const <#= typeVectorName #> trueValue)
 {
 	return _<#= vectorSimdPrefix #>_blendv_epi8(falseValue.<#= vectorVariableName #>, trueValue.<#= vectorVariableName #>, comparision.<#= vectorVariableName #>);
 }
 
 // Assignment Operators
-template<typename T, uint_fast16_t X>
-vector<T, X>& vector<T, X>::operator+=(const <#= fullVectorName #>& rhs)
+template <>
+<#= typeVectorName #>& <#= typeVectorName #>::operator+=(const <#= typeVectorName #>& rhs)
 {
 	this-><#= vectorVariableName #> = _<#= vectorSimdPrefix #>_add_epi<#= typeSize #>(this-><#= vectorVariableName #>, rhs.<#= vectorVariableName #>);
 	return *this;
 }
 
 // Comparision Operators
-//TODO Fix this not working allow implicit casts when more than one version exist
-template<typename T, uint_fast16_t X>
-<#= fullVectorName #> vector<T, X>::operator>(const <#= fullVectorName #>& vector2) const
+template <>
+<#= typeVectorName #> <#= typeVectorName #>::operator>(const <#= typeVectorName #>& vector2) const
 {
 	return _<#= vectorSimdPrefix #>_cmpgt_epi<#= typeSize #>(this-><#= vectorVariableName #>, vector2.<#= vectorVariableName #>);
 }
 #pragma endregion
+
 <#		}
 	} #>

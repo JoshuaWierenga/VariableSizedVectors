@@ -2,25 +2,17 @@
 <#@ output extension="" #>
 //TODO Merge string info arrays into a single structure
 //TODO Automate generation of typeVectorConstructorArguments
-<#	var typeSizes = new string[] {"32"}; 
-	var vectorSizes = new string[] {"128", "256"};
-
-	var typeVectorConstructorArguments = new string[,] {{"int32_t v1, int32_t v2, int32_t v3, int32_t v4"},
-													    {"int32_t v1, int32_t v2, int32_t v3, int32_t v4, int32_t v5, int32_t v6, int32_t v7, int32_t v8"}}; #>
+<#	var typeSizes = new int[] {32}; 
+	var vectorSizes = new int[] {128, 256}; #>
 #ifndef VECTOR_H
 #define VECTOR_H
+#include <array>
+#include <cstdint>
 #include <intrin.h>
-#include <sstream>
+#include <type_traits>
 
-//TODO Check if these are needed in the header, same for the constraints in general										
-template <uint_fast16_t X>
-_INLINE_VAR constexpr bool is_simd_128 = X == 128;
-
-template <uint_fast16_t X>
-_INLINE_VAR constexpr bool is_simd_256 = X == 256;
-
-template<typename T, uint_fast16_t X>
-struct vector
+template <typename T, uint_fast16_t X>
+struct Vector
 {
 	friend class VectorHelpers;
 
@@ -29,50 +21,61 @@ private:
 	__m256i vector_256_{};
 
 	//TODO Generate automatically?
-	vector(__m128i vector);
+	Vector(__m128i vector) : vector_128_(vector)
+	{
+	}
 
-	vector(__m256i vector);
+	Vector(__m256i vector) : vector_256_(vector)
+	{
+	}
 
 public:
+	// Constructors
+	Vector(T value);
+
+	explicit Vector(std::array<T, X / (8 * sizeof(T))> values);
+
+	template<class ...T2, std::enable_if_t<sizeof...(T2) == X / (8 * sizeof(T)) && std::conjunction_v<std::is_same<T, T2>...>, int> = 0>
+	explicit Vector(T2... args) : Vector(std::array<T, sizeof...(T2)>{std::forward<T2>(args)...})
+	{
+	}
+
+	Vector<T, X> static Blend(Vector<T, X> comparision, Vector<T, X> falseValue, Vector<T, X> trueValue);
+
+	// Assignment Operators
+	Vector<T, X>& operator+=(const Vector<T, X>& rhs);
+
+	// Comparision Operators
+	Vector<T, X> operator>(const Vector<T, X>& vector2) const;
+};
+
+//TODO Move into struct?
 <#	for (int i = 0; i < vectorSizes.Length; i++)
 	{
 		//Required variables
-		string vectorSize = vectorSizes[i];
-
-		//Niceties
-		string vectorVariableName = "vector_" + vectorSize + "_";
+		int vectorSize = vectorSizes[i];
 
 		for (int j = 0; j < typeSizes.Length; j++)
 		{ 
 			//Required variables
-			string typeSize = typeSizes[j], typeVectorConstructorArgument = typeVectorConstructorArguments[i,j];
+			int typeSize = typeSizes[j];
 			
 			//Niceties
-			string typeName = "int" + typeSize + "_t", fullVectorName = "vector<" + typeName + ", " + vectorSize + ">";
-			string typeVectorConstraints = "requires(std::is_same_v<T, " + typeName + "> && is_simd_" + vectorSize + "<X>)";#>
-	#pragma region <#= fullVectorName #>
+			string typeName = "int" + typeSize + "_t", typeVectorName = "Vector<" + typeName + ", " + vectorSize + ">"; #>
+#pragma region <#= typeVectorName #>
+// Constructors
+template <> <#= typeVectorName #>::Vector(<#= typeName #> value);
+template <> <#= typeVectorName #>::Vector(std::array<<#= typeName#>, <#= vectorSize / typeSize #>> values);
 
-	// Constructors
-	vector(<#= typeName #> value) <#= typeVectorConstraints #>;
+template <> <#= typeVectorName #> <#= typeVectorName #>::Blend(<#= typeVectorName #> comparision, <#= typeVectorName #> falseValue, <#= typeVectorName #> trueValue);
 
-	explicit vector(<#= typeVectorConstructorArgument #>) <#= typeVectorConstraints #>;
+// Assignment Operators
+template <> <#= typeVectorName #>& <#= typeVectorName #>::operator+=(const <#= typeVectorName #>& rhs);
 
-	//TODO Figure out how to make the types of the parameters enough to figure out which version to use and not require specifying when accessing vector
-	<#= fullVectorName #> static Blend(<#= fullVectorName #> comparision, <#= fullVectorName #> falseValue, <#= fullVectorName #> trueValue);
+// Comparision Operators
+template <> <#= typeVectorName #> <#= typeVectorName #>::operator>(const <#= typeVectorName #>& vector2) const;
+#pragma endregion
 
-	// Assignment Operators
-	vector& operator+=(const <#= fullVectorName #>& rhs);
-
-	// Comparision Operators
-	//TODO Fix this not working allow implicit casts when more than one version exist
-	<#= fullVectorName #> operator>(const <#= fullVectorName #>& vector2) const;
-	
-	#pragma endregion
 <#		}
 	} #>
-};
-
-#ifndef _DEVELOPMENT
-#include "Vector.cpp"
-#endif
 #endif //VECTOR_H
