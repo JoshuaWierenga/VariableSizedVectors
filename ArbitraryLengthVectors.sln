@@ -1,11 +1,11 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.31112.23
+# Visual Studio Version 17
+VisualStudioVersion = 17.4.33205.214
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Vectors", "Vectors\Vectors.csproj", "{6C9CD0F0-2A36-4D3D-A148-524EA99C7ECC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ArbitraryLengthVectors", "Vectors\ArbitraryLengthVectors.csproj", "{6C9CD0F0-2A36-4D3D-A148-524EA99C7ECC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "VectorsTest", "VectorsTest\VectorsTest.csproj", "{8F8290A3-F96B-48E2-A075-B88CC718E8C4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "VectorsTest", "VectorsTest\VectorsTest.csproj", "{8F8290A3-F96B-48E2-A075-B88CC718E8C4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
